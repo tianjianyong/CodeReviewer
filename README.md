@@ -48,6 +48,16 @@ MCP server 通过 stdio 传输，可被 opencode 等 MCP 客户端调用。
 }
 ```
 
+### 开发期间更新 MCP server
+
+opencode 长持有 MCP 进程（stdio 协议要求），导致 `cargo build` 无法覆盖 exe。用这个脚本重建：
+
+```sh
+pwsh -Command "pwsh -File scripts/rebuild-mcp.ps1"
+```
+
+脚本会 kill 旧进程并编译 release 版本。之后**重启 opencode** 加载新版。
+
 ### 暴露的工具
 
 - `review(path: string)` — 扫描路径，返回 JSON finding 列表
