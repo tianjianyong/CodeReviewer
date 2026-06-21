@@ -3,7 +3,7 @@
   "mcp": {
     "codereviewer": {
       "type": "local",
-      "command": ["./target/debug/codereviewer-mcp.exe"],
+      "command": ["./target/release/codereviewer-mcp.exe"],
       "enabled": true
     }
   }

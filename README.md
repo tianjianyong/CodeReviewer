@@ -41,7 +41,7 @@ MCP server 通过 stdio 传输，可被 opencode 等 MCP 客户端调用。
   "mcp": {
     "codereviewer": {
       "type": "local",
-      "command": ["./target/debug/codereviewer-mcp.exe"],
+      "command": ["./target/release/codereviewer-mcp.exe"],
       "enabled": true
     }
   }
