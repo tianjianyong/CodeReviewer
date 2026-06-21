@@ -139,23 +139,62 @@ fn walk(dir: &Path, config: &Config, out: &mut Vec<PathBuf>) {
         return;
     };
     let builtin = default_excludes();
-    let all_patterns: Vec<&str> = builtin
+    let gitignore_patterns = parse_gitignore(&dir.join(".gitignore"));
+    let all_patterns: Vec<String> = builtin
         .iter()
-        .copied()
-        .chain(config.global.exclude.iter().map(String::as_str))
+        .map(|s| s.to_string())
+        .chain(config.global.exclude.iter().cloned())
+        .chain(gitignore_patterns)
         .collect();
+    let pattern_refs: Vec<&str> = all_patterns.iter().map(String::as_str).collect();
     for entry in entries.flatten() {
         let p = entry.path();
         if p.is_dir() {
-            if !is_excluded(&p, &all_patterns) {
+            if !is_excluded(&p, &pattern_refs) {
                 walk(&p, config, out);
             }
         } else if p.is_file() && crate::parser::Language::from_path(&p).is_some() {
-            if !is_excluded(&p, &all_patterns) {
+            if !is_excluded(&p, &pattern_refs) {
                 out.push(p);
             }
         }
     }
+}
+
+/// 解析 .gitignore 文件，返回排除模式列表。
+///
+/// 支持的语法（简化版，覆盖常见用例）：
+/// - 空行和 `#` 开头的注释跳过
+/// - `dir/` 目录排除（末尾 /）
+/// - `*.ext` 后缀 glob 排除
+/// - `name` 文件/目录名排除
+/// - `!` 取反模式（MVP 忽略，不处理）
+/// - `/path` 根目录相对路径（MVP 按纯名处理）
+fn parse_gitignore(path: &Path) -> Vec<String> {
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    let mut patterns = Vec::new();
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        // 取反模式 MVP 不处理
+        if line.starts_with('!') {
+            continue;
+        }
+        // 去掉开头的 /
+        let line = line.trim_start_matches('/');
+        // 去掉末尾的 /（目录标记），统一按名匹配
+        let line = line.trim_end_matches('/');
+        // 含 ** 或 / 在中间的复杂模式 MVP 跳过
+        if line.contains("**") || line.contains('/') {
+            continue;
+        }
+        patterns.push(line.to_string());
+    }
+    patterns
 }
 
 /// 内置默认排除的非源码目录/文件模式。用户配置的 exclude 在此基础上追加，不能移除。
@@ -186,6 +225,13 @@ fn is_excluded(path: &Path, patterns: &[&str]) -> bool {
     let s = path.to_string_lossy();
     for pat in patterns {
         let pat = pat.trim_end_matches('/');
+        // *.ext 后缀 glob
+        if let Some(suffix) = pat.strip_prefix('*') {
+            if name.ends_with(suffix) {
+                return true;
+            }
+            continue;
+        }
         if s.contains(pat) || name == pat {
             return true;
         }

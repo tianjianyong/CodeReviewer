@@ -86,6 +86,17 @@ CodeReviewer 自动跳过常见非源码目录，无需手动配置：
 
 `node_modules`、`target`、`obj`、`bin`、`dist`、`build`、`out`、`.git`、`.vscode`、`.idea`、`__pycache__`、`.pytest_cache`、`vendor`、`.next`、`.nuxt`、`coverage`、`.cache`
 
+### .gitignore 支持
+
+CodeReviewer 自动读取扫描目录下的 `.gitignore` 文件并排除其中声明的模式。支持：
+
+- 目录排除（`dir/`）
+- 后缀 glob（`*.log`、`*.tmp`）
+- 文件/目录名（`dist`）
+- 注释（`#`）和空行跳过
+
+复杂语法（`!` 取反、`**` 递归 glob、`[Dd]` 字符类）暂不支持，但这些目录通常已被内置默认排除覆盖。
+
 ### 项目特定排除
 
 在项目根创建 `.codereviewer.toml` 追加项目特定目录：
