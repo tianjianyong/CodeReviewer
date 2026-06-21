@@ -80,7 +80,15 @@ pwsh -Command "pwsh -File scripts/rebuild-mcp.ps1"
 
 ## 配置
 
-在项目根创建 `.codereviewer.toml`：
+### 内置默认排除
+
+CodeReviewer 自动跳过常见非源码目录，无需手动配置：
+
+`node_modules`、`target`、`obj`、`bin`、`dist`、`build`、`out`、`.git`、`.vscode`、`.idea`、`__pycache__`、`.pytest_cache`、`vendor`、`.next`、`.nuxt`、`coverage`、`.cache`
+
+### 项目特定排除
+
+在项目根创建 `.codereviewer.toml` 追加项目特定目录：
 
 ```toml
 [global]

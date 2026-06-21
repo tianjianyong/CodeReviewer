@@ -138,25 +138,55 @@ fn walk(dir: &Path, config: &Config, out: &mut Vec<PathBuf>) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
+    let builtin = default_excludes();
+    let all_patterns: Vec<&str> = builtin
+        .iter()
+        .copied()
+        .chain(config.global.exclude.iter().map(String::as_str))
+        .collect();
     for entry in entries.flatten() {
         let p = entry.path();
         if p.is_dir() {
-            if !is_excluded(&p, &config.global.exclude) {
+            if !is_excluded(&p, &all_patterns) {
                 walk(&p, config, out);
             }
         } else if p.is_file() && crate::parser::Language::from_path(&p).is_some() {
-            if !is_excluded(&p, &config.global.exclude) {
+            if !is_excluded(&p, &all_patterns) {
                 out.push(p);
             }
         }
     }
 }
 
-fn is_excluded(path: &Path, patterns: &[String]) -> bool {
+/// 内置默认排除的非源码目录/文件模式。用户配置的 exclude 在此基础上追加，不能移除。
+fn default_excludes() -> &'static [&'static str] {
+    &[
+        "node_modules",
+        "target",
+        "obj",
+        "bin",
+        "dist",
+        "build",
+        "out",
+        ".git",
+        ".vscode",
+        ".idea",
+        "__pycache__",
+        ".pytest_cache",
+        "vendor",
+        ".next",
+        ".nuxt",
+        "coverage",
+        ".cache",
+    ]
+}
+
+fn is_excluded(path: &Path, patterns: &[&str]) -> bool {
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
     let s = path.to_string_lossy();
     for pat in patterns {
-        if s.contains(pat.trim_end_matches('/')) || name == *pat {
+        let pat = pat.trim_end_matches('/');
+        if s.contains(pat) || name == pat {
             return true;
         }
     }
