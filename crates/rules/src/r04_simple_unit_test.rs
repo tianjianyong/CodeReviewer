@@ -67,11 +67,8 @@ fn function_kinds(lang: Language) -> &'static [&'static str] {
     match lang {
         Language::Rust => &["function_item"],
         Language::Python => &["function_definition"],
-        Language::TypeScript | Language::TypeScriptTsx => &[
-            "function_declaration",
-            "method_definition",
-            "call_expression",
-        ],
+        // TS/TSX: test/it 是 call_expression，不是 function_declaration
+        Language::TypeScript | Language::TypeScriptTsx => &["call_expression"],
         Language::CSharp => &["method_declaration"],
         Language::Java => &["method_declaration"],
     }
@@ -89,15 +86,48 @@ fn is_test_function(node: &tree_sitter::Node, ctx: &AnalysisContext) -> bool {
             false
         }
         Language::Python => extract_function_name(node, ctx).starts_with("test_"),
-        Language::TypeScript | Language::TypeScriptTsx => {
-            let text = node_text(node, ctx.source);
-            text.contains("test(") || text.contains("it(")
-        }
+        // TS/TSX: 必须是 test(...)/it(...) 调用，callee 是 identifier
+        Language::TypeScript | Language::TypeScriptTsx => is_test_or_it_call(node, ctx),
         Language::CSharp | Language::Java => {
             let text = node_text(node, ctx.source);
             text.contains("@Test") || text.contains("[Test]") || text.contains("[TestMethod]")
         }
     }
+}
+
+/// TS: 检查 call_expression 的 callee 是否为 identifier `test` 或 `it`
+fn is_test_or_it_call(node: &tree_sitter::Node, ctx: &AnalysisContext) -> bool {
+    if node.kind() != "call_expression" {
+        return false;
+    }
+    let Some(callee) = callee_identifier(node, ctx) else {
+        return false;
+    };
+    matches!(callee, "test" | "it")
+}
+
+/// 提取 call_expression 的 callee identifier 名字（支持 `test(...)` 和 `describe.each(...)` 等链式调用的最内层）
+fn callee_identifier<'a>(node: &tree_sitter::Node, ctx: &AnalysisContext<'a>) -> Option<&'a str> {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "identifier" {
+            return Some(node_text(&child, ctx.source));
+        }
+        // 链式调用 test.only(...) / test.skip(...) 等：callee 是 member_expression
+        if child.kind() == "member_expression" {
+            let mut inner = child.walk();
+            for c in child.children(&mut inner) {
+                if c.kind() == "identifier" {
+                    let name = node_text(&c, ctx.source);
+                    // 只认最左侧 identifier 是 test/it
+                    if matches!(name, "test" | "it") {
+                        return Some(name);
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 fn has_test_attribute_as_child(node: &tree_sitter::Node, ctx: &AnalysisContext) -> bool {
@@ -131,6 +161,12 @@ fn has_test_attribute_as_prev_sibling(node: &tree_sitter::Node, ctx: &AnalysisCo
 }
 
 fn extract_function_name(node: &tree_sitter::Node, ctx: &AnalysisContext) -> String {
+    // TS call_expression: 名字是 callee（如 test/it）
+    if ctx.language == Language::TypeScript || ctx.language == Language::TypeScriptTsx {
+        if node.kind() == "call_expression" {
+            return callee_identifier(node, ctx).unwrap_or("").to_string();
+        }
+    }
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
         if child.kind() == "identifier" {
@@ -141,15 +177,34 @@ fn extract_function_name(node: &tree_sitter::Node, ctx: &AnalysisContext) -> Str
 }
 
 fn count_assertions(node: &tree_sitter::Node, ctx: &AnalysisContext) -> usize {
+    // TS/TSX: AST 数 expect(...) call_expression
+    if ctx.language == Language::TypeScript || ctx.language == Language::TypeScriptTsx {
+        return count_expect_calls(node, ctx);
+    }
     let assert_keywords: &[&str] = match ctx.language {
         Language::Rust => &["assert!", "assert_eq!", "assert_ne!", "panic!"],
         Language::Python => &["assert ", "self.assert"],
-        Language::TypeScript | Language::TypeScriptTsx => &["expect(", "assert."],
         Language::CSharp => &["Assert."],
         Language::Java => &["assertEquals", "assertTrue", "assertFalse", "assertThrows"],
+        _ => &[],
     };
     let text = node_text(node, ctx.source);
     assert_keywords.iter().map(|k| text.matches(k).count()).sum()
+}
+
+/// TS: 统计子树内 expect(...) call_expression 数量
+fn count_expect_calls(node: &tree_sitter::Node, ctx: &AnalysisContext) -> usize {
+    let mut count = 0;
+    walk(*node, &mut |n| {
+        if n.kind() == "call_expression" {
+            if let Some(callee) = callee_identifier(&n, ctx) {
+                if matches!(callee, "expect" | "assert") {
+                    count += 1;
+                }
+            }
+        }
+    });
+    count
 }
 
 fn node_text<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
