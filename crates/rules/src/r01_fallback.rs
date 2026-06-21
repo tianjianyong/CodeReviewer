@@ -1,6 +1,8 @@
 //! R01: 回退掩盖问题检测。
 //!
-//! 检测模式：catch 后返回默认值、unwrap_or 吞错误、? 后紧接 fallback。
+//! Rust: AST 检测 unwrap_or / unwrap_or_default / unwrap_or_else method call。
+//! Python: AST 检测 except_clause (bare except 或 except Exception)。
+//! TypeScript/C#/Java: AST 检测 catch_clause 内有 return。
 
 use codereviewer_core::finding::{Finding, Location, Severity};
 use codereviewer_core::parser::Language;
@@ -31,95 +33,117 @@ impl Rule for FallbackMasksError {
 
     fn analyze(&self, ctx: &AnalysisContext) -> Result<Vec<Finding>, RuleError> {
         let mut findings = Vec::new();
-        let patterns = patterns(ctx.language);
-
-        for (i, line) in ctx.source.lines().enumerate() {
-            let trimmed = line.trim();
-            for pat in patterns {
-                if trimmed.contains(pat.keyword) {
-                if (pat.is_fallback)(trimmed) {
-                        findings.push(Finding {
-                            rule_id: "R01",
-                            rule_name: "fallback-masks-error",
-                            severity: Severity::Error,
-                            location: Location {
-                                file: ctx.file_path.to_path_buf(),
-                                line: i + 1,
-                                column: 1,
-                            },
-                            message: pat.message.to_string(),
-                            snippet: Some(trimmed.to_string()),
-                        });
-                    }
-                }
-            }
+        match ctx.language {
+            Language::Rust => find_rust_fallbacks(ctx, &mut findings),
+            Language::Python => find_python_fallbacks(ctx, &mut findings),
+            Language::TypeScript | Language::TypeScriptTsx => find_catch_fallbacks(ctx, &mut findings, "catch with default return masks error"),
+            Language::CSharp | Language::Java => find_catch_fallbacks(ctx, &mut findings, "catch with default return masks exception"),
         }
         Ok(findings)
     }
 }
 
-struct Pattern {
-    keyword: &'static str,
-    message: &'static str,
-    is_fallback: fn(&str) -> bool,
+fn find_rust_fallbacks(ctx: &AnalysisContext, findings: &mut Vec<Finding>) {
+    walk(ctx.tree.root_node(), &mut |node| {
+        if node.kind() != "call_expression" {
+            return;
+        }
+        let Some(method_name) = extract_method_name(&node, ctx) else {
+            return;
+        };
+        let message = match method_name {
+            "unwrap_or_default" => "unwrap_or_default() masks error case",
+            "unwrap_or" => "unwrap_or() masks None/Err case",
+            "unwrap_or_else" => "unwrap_or_else() may mask error case",
+            _ => return,
+        };
+        push_finding(findings, ctx, &node, message);
+    });
 }
 
-fn patterns(lang: Language) -> &'static [Pattern] {
-    match lang {
-        Language::Rust => &[
-            Pattern {
-                keyword: "unwrap_or_default",
-                message: "unwrap_or_default() masks error case",
-                is_fallback: |s| s.contains("unwrap_or_default()"),
-            },
-            Pattern {
-                keyword: "unwrap_or(",
-                message: "unwrap_or() masks None/Err case",
-                is_fallback: |s| s.contains("unwrap_or(") && !s.contains("unwrap_or_else"),
-            },
-            Pattern {
-                keyword: "unwrap_or_else(",
-                message: "unwrap_or_else() may mask error case",
-                is_fallback: |s| s.contains("unwrap_or_else(||") && !s.contains("?"),
-            },
-        ],
-        Language::Python => &[
-            Pattern {
-                keyword: "except:",
-                message: "bare except masks errors",
-                is_fallback: |s| s.contains("except:") || s.contains("except Exception:"),
-            },
-            Pattern {
-                keyword: ".get(",
-                message: ".get() with default masks missing key",
-                is_fallback: |s| {
-                    s.contains(".get(") && s.contains(",") && !s.contains("##")
-                },
-            },
-        ],
-        Language::TypeScript | Language::TypeScriptTsx => &[
-            Pattern {
-                keyword: "catch",
-                message: "catch with default return masks error",
-                is_fallback: |s| {
-                    (s.contains("catch") && (s.contains("return") || s.contains("||")))
-                        || (s.contains("??") && s.contains("return"))
-                },
-            },
-        ],
-        Language::CSharp => &[
-            Pattern {
-                keyword: "catch",
-                message: "catch with default return masks exception",
-                is_fallback: |s| s.contains("catch") && s.contains("return"),
-            },
-        ],
-        Language::Java => &[
-            Pattern {
-                keyword: "catch",
-                message: "catch with default return masks exception",
-                is_fallback: |s| s.contains("catch") && s.contains("return"),
-            },
-        ],
+fn extract_method_name<'a>(node: &tree_sitter::Node, ctx: &AnalysisContext<'a>) -> Option<&'a str> {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "field_expression" {
+            let mut inner = child.walk();
+            for c in child.children(&mut inner) {
+                if c.kind() == "field_identifier" {
+                    return Some(node_text(&c, ctx.source));
+                }
+            }
+        }
+    }
+    None
+}
+
+fn find_python_fallbacks(ctx: &AnalysisContext, findings: &mut Vec<Finding>) {
+    walk(ctx.tree.root_node(), &mut |node| {
+        if node.kind() == "except_clause" {
+            let text = node_text(&node, ctx.source);
+            let is_bare = text.trim_start().starts_with("except:");
+            let is_broad = text.contains("except Exception:") || text.contains("except BaseException:");
+            if is_bare || is_broad {
+                push_finding(findings, ctx, &node, "bare/broad except masks errors");
+            }
+        }
+    });
+}
+
+fn find_catch_fallbacks(ctx: &AnalysisContext, findings: &mut Vec<Finding>, message: &str) {
+    let catch_kind = match ctx.language {
+        Language::TypeScript | Language::TypeScriptTsx => "catch_clause",
+        Language::CSharp => "catch_clause",
+        Language::Java => "catch_clause",
+        _ => return,
+    };
+    walk(ctx.tree.root_node(), &mut |node| {
+        if node.kind() == catch_kind && has_return_in_subtree(&node) {
+            push_finding(findings, ctx, &node, message);
+        }
+    });
+}
+
+fn has_return_in_subtree(node: &tree_sitter::Node) -> bool {
+    let mut stack = vec![*node];
+    while let Some(n) = stack.pop() {
+        if n.kind() == "return_statement" || n.kind() == "return" {
+            return true;
+        }
+        let mut cursor = n.walk();
+        for child in n.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+    false
+}
+
+fn push_finding(findings: &mut Vec<Finding>, ctx: &AnalysisContext, node: &tree_sitter::Node, message: &str) {
+    let pos = node.start_position();
+    findings.push(Finding {
+        rule_id: "R01",
+        rule_name: "fallback-masks-error",
+        severity: Severity::Error,
+        location: Location {
+            file: ctx.file_path.to_path_buf(),
+            line: pos.row + 1,
+            column: pos.column + 1,
+        },
+        message: message.to_string(),
+        snippet: None,
+    });
+}
+
+fn node_text<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
+    source.get(node.start_byte()..node.end_byte()).unwrap_or("")
+}
+
+fn walk<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
+    let mut stack = vec![node];
+    while let Some(n) = stack.pop() {
+        visit(n);
+        let mut cursor = n.walk();
+        for child in n.children(&mut cursor) {
+            stack.push(child);
+        }
     }
 }
