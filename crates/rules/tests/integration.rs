@@ -41,7 +41,19 @@ fn test_problematic_finds_multiple_rule_types() {
     assert!(rule_ids.contains(&"R06"), "should find R06 over-engineering");
     assert!(rule_ids.contains(&"R08"), "should find R08 TODO");
     assert!(rule_ids.contains(&"R09"), "should find R09 commented code");
-    assert!(rule_ids.contains(&"R10"), "should find R10 magic number");
+    // R10 is skipped because fixture is under tests/ directory
+    assert!(!rule_ids.contains(&"R10"), "R10 should skip test files");
+}
+
+#[test]
+fn test_r10_skips_test_files() {
+    let rules = codereviewer_rules::all_rules();
+    let analyzer = Analyzer::new(rules, Config::default());
+    // problematic.rs is under tests/fixtures/ -> R10 should be skipped
+    let path = fixtures_dir().join("problematic.rs");
+    let result = analyzer.analyze_path(&path);
+    let r10_count = result.findings.iter().filter(|f| f.rule_id == "R10").count();
+    assert_eq!(r10_count, 0, "R10 should skip files under tests/ directory");
 }
 
 #[test]

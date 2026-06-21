@@ -30,6 +30,10 @@ impl Rule for MagicNumber {
     }
 
     fn analyze(&self, ctx: &AnalysisContext) -> Result<Vec<Finding>, RuleError> {
+        // 测试文件里的数字几乎都是测试输入数据，跳过 R10
+        if is_test_file(ctx.file_path) {
+            return Ok(Vec::new());
+        }
         let literal_kinds = literal_kinds(ctx.language);
         let skip_parent_kinds = skip_parent_kinds(ctx.language);
         let min_string_len = ctx.rule_config.threshold_i64("min_string_length", 10) as usize;
@@ -104,6 +108,33 @@ fn literal_kinds(lang: Language) -> &'static [&'static str] {
             "string_literal",
         ],
     }
+}
+
+fn is_test_file(path: &std::path::Path) -> bool {
+    let path_str = path.to_string_lossy().to_lowercase();
+    if path_str.contains("\\tests\\")
+        || path_str.contains("/tests/")
+        || path_str.contains("\\test\\")
+        || path_str.contains("/test/")
+        || path_str.contains("\\__tests__\\")
+        || path_str.contains("/__tests__/")
+    {
+        return true;
+    }
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    name.starts_with("test_")
+        || name.starts_with("test.")
+        || name.contains("_test.")
+        || name.contains(".test.")
+        || name.contains(".spec.")
+        || name.ends_with("tests.cs")
+        || name.ends_with("test.cs")
+        || name.ends_with("test.java")
+        || name.ends_with("tests.java")
 }
 
 fn is_magic(kind: &str, text: &str, min_string_len: usize) -> bool {
