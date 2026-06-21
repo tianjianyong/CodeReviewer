@@ -1,0 +1,16 @@
+[package]
+name = "codereviewer-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+codereviewer-core = { path = "../core" }
+codereviewer-rules = { path = "../rules" }
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
+
+[[bin]]
+name = "codereviewer"
+path = "src/main.rs"
