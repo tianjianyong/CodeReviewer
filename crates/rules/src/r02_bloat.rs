@@ -68,8 +68,8 @@ impl Rule for StructuralBloat {
                             column: start.column + 1,
                         },
                         message: format!(
-                            "function too long: {} lines (max {})",
-                            lines, max
+                            "函数过长：{} 行（上限 {}） | function too long: {} lines (max {})",
+                            lines, max, lines, max
                         ),
                         snippet: None,
                     });
@@ -87,8 +87,8 @@ impl Rule for StructuralBloat {
                                 column: start.column + 1,
                             },
                             message: format!(
-                                "too many parameters: {} (max {})",
-                                params, max_params
+                                "参数过多：{} 个（上限 {}） | too many parameters: {} (max {})",
+                                params, max_params, params, max_params
                             ),
                             snippet: None,
                         });
@@ -107,8 +107,8 @@ impl Rule for StructuralBloat {
                             column: start.column + 1,
                         },
                         message: format!(
-                            "nesting too deep: {} levels (max {})",
-                            depth, max_nesting
+                            "嵌套过深：{} 层（上限 {}） | nesting too deep: {} levels (max {})",
+                            depth, max_nesting, depth, max_nesting
                         ),
                         snippet: None,
                     });

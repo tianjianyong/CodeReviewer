@@ -119,7 +119,7 @@ impl Analyzer {
                 line: 1,
                 column: 1,
             },
-            message: format!("rule failed: {msg}"),
+            message: format!("规则失败：{msg} | rule failed: {msg}"),
             snippet: None,
         }
     }

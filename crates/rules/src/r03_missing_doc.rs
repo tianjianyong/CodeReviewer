@@ -46,7 +46,7 @@ impl Rule for MissingDoc {
                             line: pos.row + 1,
                             column: pos.column + 1,
                         },
-                        message: format!("public item without doc comment: {}", node.kind()),
+                        message: format!("公开项缺少文档注释：{} | public item without doc comment: {}", node.kind(), node.kind()),
                         snippet: None,
                     });
                 }

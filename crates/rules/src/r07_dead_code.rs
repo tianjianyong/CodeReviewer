@@ -50,7 +50,7 @@ impl Rule for DeadCode {
                         line: imp.line,
                         column: 1,
                     },
-                    message: format!("unused import: {}", imp.name),
+                    message: format!("未使用的 import：{} | unused import: {}", imp.name, imp.name),
                     snippet: None,
                 });
             }

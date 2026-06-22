@@ -254,16 +254,18 @@ impl Language {
 ### 7.1 终端彩色（默认）
 
 ```
-R01 error  src/api.rs:42:9   fallback masks error: unwrap_or() hides None case
+R01 错误(error)  src/api.rs:42:9   unwrap_or() 掩盖 None/Err 情况 | unwrap_or() masks None/Err case
      │
   42 │     let x = opt.unwrap_or(default);
      │                       ^^^^^^^
 
-R02 warning src/api.rs:120:5  function too long: 78 lines (max 50)
+R02 警告(warning) src/api.rs:120:5  函数过长：78 行（上限 50） | function too long: 78 lines (max 50)
 ```
 
-- error: 红色，warning: 黄色，info: 蓝色
-- 末尾汇总：`Found 12 findings (3 errors, 7 warnings, 2 infos) in 18 files`
+- severity 面向用户展示为中英双语标签：`错误(error)` 红色，`警告(warning)` 黄色，`信息(info)` 蓝色
+- 每条 finding 的 message 为「中文 | 英文」双语并列
+- 末尾汇总：`发现 12 条问题（3 错误 / 7 警告 / 2 信息） | Found 12 findings (3 errors, 7 warnings, 2 infos) in 18 files`
+- 注：`label()`（`error`/`warning`/`info` 英文 key）保留给 JSON 序列化、CLI `--severity` 解析、MCP 输出等机器可读场景
 
 ### 7.2 JSON 输出（`--format json`）
 
@@ -276,7 +278,7 @@ R02 warning src/api.rs:120:5  function too long: 78 lines (max 50)
       "rule_name": "fallback-masks-error",
       "severity": "error",
       "location": { "file": "src/api.rs", "line": 42, "column": 9 },
-      "message": "unwrap_or() hides None case",
+      "message": "unwrap_or() 掩盖 None/Err 情况 | unwrap_or() masks None/Err case",
       "snippet": null
     }
   ]

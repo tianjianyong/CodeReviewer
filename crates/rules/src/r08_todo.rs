@@ -51,7 +51,7 @@ impl Rule for TodoFixme {
                         line: pos.row + 1,
                         column: pos.column + 1,
                     },
-                    message: "TODO/FIXME marker found".to_string(),
+                    message: "发现 TODO/FIXME 标记 | TODO/FIXME marker found".to_string(),
                     snippet: Some(text.trim().to_string()),
                 });
             }

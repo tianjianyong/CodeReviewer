@@ -13,11 +13,21 @@ pub enum Severity {
 }
 
 impl Severity {
+    /// 机器可读的英文 key（用于 JSON 序列化、CLI --severity 解析、MCP 输出）。
     pub fn label(self) -> &'static str {
         match self {
             Severity::Error => "error",
             Severity::Warning => "warning",
             Severity::Info => "info",
+        }
+    }
+
+    /// 面向用户的中文+英文展示标签（用于终端文本输出）。
+    pub fn display_label(self) -> &'static str {
+        match self {
+            Severity::Error => "错误(error)",
+            Severity::Warning => "警告(warning)",
+            Severity::Info => "信息(info)",
         }
     }
 }

@@ -36,8 +36,8 @@ impl Rule for FallbackMasksError {
         match ctx.language {
             Language::Rust => find_rust_fallbacks(ctx, &mut findings),
             Language::Python => find_python_fallbacks(ctx, &mut findings),
-            Language::TypeScript | Language::TypeScriptTsx => find_catch_fallbacks(ctx, &mut findings, "catch with default return masks error"),
-            Language::CSharp | Language::Java => find_catch_fallbacks(ctx, &mut findings, "catch with default return masks exception"),
+            Language::TypeScript | Language::TypeScriptTsx => find_catch_fallbacks(ctx, &mut findings, "catch 以默认返回值掩盖错误 | catch with default return masks error"),
+            Language::CSharp | Language::Java => find_catch_fallbacks(ctx, &mut findings, "catch 以默认返回值掩盖异常 | catch with default return masks exception"),
         }
         Ok(findings)
     }
@@ -52,9 +52,9 @@ fn find_rust_fallbacks(ctx: &AnalysisContext, findings: &mut Vec<Finding>) {
             return;
         };
         let message = match method_name {
-            "unwrap_or_default" => "unwrap_or_default() masks error case",
-            "unwrap_or" => "unwrap_or() masks None/Err case",
-            "unwrap_or_else" => "unwrap_or_else() may mask error case",
+            "unwrap_or_default" => "unwrap_or_default() 掩盖错误情况 | unwrap_or_default() masks error case",
+            "unwrap_or" => "unwrap_or() 掩盖 None/Err 情况 | unwrap_or() masks None/Err case",
+            "unwrap_or_else" => "unwrap_or_else() 可能掩盖错误情况 | unwrap_or_else() may mask error case",
             _ => return,
         };
         push_finding(findings, ctx, &node, message);
@@ -83,7 +83,7 @@ fn find_python_fallbacks(ctx: &AnalysisContext, findings: &mut Vec<Finding>) {
             let is_bare = text.trim_start().starts_with("except:");
             let is_broad = text.contains("except Exception:") || text.contains("except BaseException:");
             if is_bare || is_broad {
-                push_finding(findings, ctx, &node, "bare/broad except masks errors");
+                push_finding(findings, ctx, &node, "裸/宽泛的 except 吞掉错误 | bare/broad except masks errors");
             }
         }
     });

@@ -67,8 +67,8 @@ impl Rule for CommentedCode {
                             column: 1,
                         },
                         message: format!(
-                            "commented-out code block: {} lines (min {})",
-                            count, min_block
+                            "注释掉的代码块：{} 行（下限 {}） | commented-out code block: {} lines (min {})",
+                            count, min_block, count, min_block
                         ),
                         snippet: None,
                     });

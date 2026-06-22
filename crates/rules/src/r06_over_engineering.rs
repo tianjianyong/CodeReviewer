@@ -86,8 +86,8 @@ fn detect_single_impl_traits(ctx: &AnalysisContext) -> Vec<Finding> {
                     column: tr.column,
                 },
                 message: format!(
-                    "trait {} has only {} implementation(s) - consider if abstraction is needed",
-                    tr.name, impl_count
+                    "trait {} 仅有 {} 处实现——请考虑是否需要此抽象 | trait {} has only {} implementation(s) - consider if abstraction is needed",
+                    tr.name, impl_count, tr.name, impl_count
                 ),
                 snippet: None,
             });
@@ -114,8 +114,8 @@ fn detect_excess_generics(ctx: &AnalysisContext) -> Vec<Finding> {
                         column: pos.column + 1,
                     },
                     message: format!(
-                        "excessive generics: {} type parameters (max {})",
-                        count, max_generics
+                        "泛型过多：{} 个类型参数（上限 {}） | excessive generics: {} type parameters (max {})",
+                        count, max_generics, count, max_generics
                     ),
                     snippet: None,
                 });

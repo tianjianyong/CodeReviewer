@@ -68,7 +68,7 @@ fn main() -> Result<()> {
         }
         Command::ListRules => {
             for rule in codereviewer_rules::all_rules() {
-                println!("{} {} [{}]", rule.id(), rule.name(), rule.severity().label());
+                println!("{} {} [{}]", rule.id(), rule.name(), rule.severity().display_label());
             }
         }
     }

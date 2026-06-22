@@ -50,8 +50,8 @@ impl Rule for SimpleUnitTest {
                             column: pos.column + 1,
                         },
                         message: format!(
-                            "test '{}' has only {} assertion(s) (min {})",
-                            name, assert_count, min_asserts
+                            "测试 '{}' 仅有 {} 条断言（下限 {}） | test '{}' has only {} assertion(s) (min {})",
+                            name, assert_count, min_asserts, name, assert_count, min_asserts
                         ),
                         snippet: None,
                     });

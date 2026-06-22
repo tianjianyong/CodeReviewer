@@ -49,8 +49,8 @@ impl Rule for ShallowIntegration {
                             column: pos.column + 1,
                         },
                         message: format!(
-                            "integration test has only {} meaningful check(s) (min {})",
-                            checks, min_checks
+                            "集成测试仅有 {} 处有效校验（下限 {}） | integration test has only {} meaningful check(s) (min {})",
+                            checks, min_checks, checks, min_checks
                         ),
                         snippet: None,
                     });

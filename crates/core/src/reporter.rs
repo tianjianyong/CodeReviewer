@@ -22,7 +22,7 @@ impl Report {
             let sev = if color {
                 colorize(f.severity)
             } else {
-                f.severity.label().to_string()
+                f.severity.display_label().to_string()
             };
             out.push_str(&format!(
                 "{} {} {}:{}:{}  {}\n",
@@ -36,7 +36,11 @@ impl Report {
         }
         let (e, w, i) = count_by_severity(&self.result.findings);
         out.push_str(&format!(
-            "\nFound {} findings ({} errors, {} warnings, {} infos) in {} files",
+            "\n发现 {} 条问题（{} 错误 / {} 警告 / {} 信息） | Found {} findings ({} errors, {} warnings, {} infos) in {} files",
+            self.result.findings.len(),
+            e,
+            w,
+            i,
             self.result.findings.len(),
             e,
             w,
@@ -44,7 +48,10 @@ impl Report {
             self.result.files_scanned,
         ));
         if self.result.files_skipped > 0 {
-            out.push_str(&format!(", {} skipped", self.result.files_skipped));
+            out.push_str(&format!(
+                "，跳过 {} 个 | , {} skipped",
+                self.result.files_skipped, self.result.files_skipped
+            ));
         }
         out
     }
@@ -96,5 +103,5 @@ fn colorize(severity: Severity) -> String {
         Severity::Warning => "33",
         Severity::Info => "34",
     };
-    format!("\x1b[{}m{}\x1b[0m", code, severity.label())
+    format!("\x1b[{}m{}\x1b[0m", code, severity.display_label())
 }
