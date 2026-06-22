@@ -85,7 +85,7 @@ fn test_files_scanned_count() {
 #[test]
 fn test_list_rules_returns_all() {
     let rules = codereviewer_rules::all_rules();
-    assert_eq!(rules.len(), 10, "should have exactly 10 rules");
+    assert_eq!(rules.len(), 19, "should have exactly 19 rules");
 }
 
 #[test]

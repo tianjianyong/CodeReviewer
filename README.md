@@ -63,7 +63,9 @@ pwsh -Command "pwsh -File scripts/rebuild-mcp.ps1"
 - `review(path: string)` — 扫描路径，返回 JSON finding 列表
 - `list_rules()` — 列出所有可用规则
 
-## 检测规则（MVP 10 条）
+## 检测规则（19 条）
+
+### 基础规则（R01–R10）
 
 | ID | 规则名 | 严重级 | 说明 |
 |----|--------|--------|------|
@@ -77,6 +79,24 @@ pwsh -Command "pwsh -File scripts/rebuild-mcp.ps1"
 | R08 | todo-fixme-accumulation | info | TODO/FIXME 堆积 |
 | R09 | commented-out-code | warning | 注释掉的代码块 |
 | R10 | magic-number | info | 魔法数字/字符串 |
+
+### AI 代码专项规则（R14–R28）
+
+针对 AI vibe coding 高频缺陷，详见 [候选规则清单](docs/design/rule-candidates.md)。
+
+| ID | 规则名 | 严重级 | 说明 |
+|----|--------|--------|------|
+| R14 | hardcoded-secret | error | 硬编码 API key/token/私钥 |
+| R15 | missing-input-validation | warning | 边界函数对外部输入无空值/越界校验 |
+| R16 | self-validating-test | warning | 测试名只描述方法不描述行为/访问私有成员 |
+| R18 | async-missing-await | error | async 函数调用未加 await |
+| R19 | n-plus-one-query | warning | ORM 循环访问关系字段触发 N+1 查询 |
+| R20 | resource-leak | warning | open/addEventListener 无配对 close/remove |
+| R23 | wrong-error-type-propagation | warning | 宽泛 catch 返回固定值丢错误类型信息 |
+| R24 | hardcoded-path-or-url | warning | 源码硬编码绝对路径/URL |
+| R28 | overly-defensive-handling | info | 对不可失败操作套 try/catch/unwrap_or |
+
+> 候选未实现规则（R11/R12/R13/R17/R21/R22/R25/R26/R27）见 `docs/design/rule-candidates.md`。
 
 ## 配置
 
