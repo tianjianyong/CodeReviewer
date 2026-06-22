@@ -60,7 +60,7 @@ impl Rule for MagicNumber {
                     line: pos.row + 1,
                     column: pos.column + 1,
                 },
-                message: format!("magic literal: {}", text),
+                message: format!("魔法字面量：{} | magic literal: {}", text, text),
                 snippet: None,
             });
         });
@@ -111,14 +111,13 @@ fn literal_kinds(lang: Language) -> &'static [&'static str] {
 }
 
 fn is_test_file(path: &std::path::Path) -> bool {
-    let path_str = path.to_string_lossy().to_lowercase();
-    if path_str.contains("\\tests\\")
-        || path_str.contains("/tests/")
-        || path_str.contains("\\test\\")
-        || path_str.contains("/test/")
-        || path_str.contains("\\__tests__\\")
-        || path_str.contains("/__tests__/")
-    {
+    // 遍历路径各段目录名，判断是否位于 tests/test/__tests__ 目录下。
+    // 用 components() 而非字符串 contains，避免相对路径（开头无分隔符）漏判。
+    let has_test_dir = path.components().any(|c| {
+        let s = c.as_os_str().to_string_lossy().to_lowercase();
+        matches!(s.as_str(), "tests" | "test" | "__tests__")
+    });
+    if has_test_dir {
         return true;
     }
     let name = path
@@ -163,5 +162,51 @@ fn walk<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
         for child in n.children(&mut cursor) {
             stack.push(child);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::is_test_file;
+
+    #[test]
+    fn test_relative_path_with_tests_dir() {
+        assert!(is_test_file(Path::new("tests/fixtures/problematic.rs")));
+        assert!(is_test_file(Path::new("tests/foo.rs")));
+    }
+
+    #[test]
+    fn test_absolute_path_with_tests_dir() {
+        let p = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("tests")
+            .join("fixtures")
+            .join("problematic.rs");
+        assert!(is_test_file(&p));
+    }
+
+    #[test]
+    fn test_unix_style_relative_path() {
+        assert!(is_test_file(Path::new("tests/fixtures/foo.rs")));
+        assert!(is_test_file(Path::new("src/__tests__/foo.ts")));
+    }
+
+    #[test]
+    fn test_non_test_path_not_flagged() {
+        assert!(!is_test_file(Path::new("src/main.rs")));
+        assert!(!is_test_file(Path::new("crates/core/src/finding.rs")));
+    }
+
+    #[test]
+    fn test_test_file_by_name() {
+        assert!(is_test_file(Path::new("src/test_foo.rs")));
+        assert!(is_test_file(Path::new("src/foo_test.rs")));
+        assert!(is_test_file(Path::new("src/foo.test.ts")));
+        assert!(is_test_file(Path::new("src/foo.spec.ts")));
     }
 }
