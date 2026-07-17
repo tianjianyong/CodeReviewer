@@ -71,8 +71,8 @@ impl Rule for HardcodedSecret {
                     column: pos.column + 1,
                 },
                 message: format!(
-                    "疑似硬编码密钥（{}） | suspected hardcoded secret ({})",
-                    reason_zh(reason), reason_en(reason)
+                    "疑似硬编码密钥（{}）：{} | suspected hardcoded secret ({}): {}",
+                    reason_zh(reason), inner, reason_en(reason), inner
                 ),
                 snippet: None,
             });
@@ -123,10 +123,20 @@ fn classify(s: &str, min_len: usize) -> Option<Reason> {
 }
 
 fn is_high_entropy(s: &str) -> bool {
+    // URL 路径/文件路径含 '/'，不像随机密钥；JWT 含 '.'，但 eyJ 前缀已被 KnownPrefix 覆盖
+    if s.contains('/') || s.contains('.') {
+        return false;
+    }
+    // 全大写蛇形标识符（如 COMPREFACE_API_KEY）是环境变量名本身，不是密钥值
+    let has_lower = s.chars().any(|c| c.is_ascii_lowercase());
+    let has_digit = s.chars().any(|c| c.is_ascii_digit());
+    if !has_lower && !has_digit {
+        return false;
+    }
     // base64 / hex 字符集
     let is_b64 = s
         .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=');
+        .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '_' || c == '-');
     let is_hex = s.chars().all(|c| c.is_ascii_hexdigit());
     if !is_b64 && !is_hex {
         return false;
