@@ -79,10 +79,10 @@ pub fn parse(source: &str, language: Language) -> Result<Tree, ParseError> {
         .ok_or(ParseError::NoTree)
 }
 
-pub fn parse_file(path: &Path) -> Result<(Tree, Language), ParseError> {
+pub fn parse_file(path: &Path) -> Result<(Tree, Language, String), ParseError> {
     let language = Language::from_path(path)
         .ok_or_else(|| ParseError::UnsupportedExtension(path.to_string_lossy().into_owned()))?;
     let source = std::fs::read_to_string(path)?;
     let tree = parse(&source, language)?;
-    Ok((tree, language))
+    Ok((tree, language, source))
 }

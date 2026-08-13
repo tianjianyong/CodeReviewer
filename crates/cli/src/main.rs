@@ -42,7 +42,15 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Command::Check { path, format, config, rules, severity } => {
-            let cfg = load_config(config.as_deref())?;
+            if !matches!(format.as_str(), "text" | "json") {
+                bail!(
+                    "无效输出格式：{format}（可选 text/json） | invalid format: {format} (text/json)"
+                );
+            }
+            let cfg = match config.as_deref() {
+                Some(p) => Config::load_from_file(p).context("failed to load config")?,
+                None => Config::load_auto().context("failed to load project config")?,
+            };
             let mut all_rules = codereviewer_rules::all_rules();
             if let Some(filter) = &rules {
                 let unknown: Vec<&str> = filter
@@ -101,32 +109,6 @@ fn main() -> Result<()> {
         }
     }
     Ok(())
-}
-
-fn load_config(path: Option<&std::path::Path>) -> Result<Config> {
-    if let Some(p) = path {
-        return Config::load_from_file(p).context("failed to load config");
-    }
-    if let Some(found) = find_project_config() {
-        Config::load_from_file(&found).context("failed to load project config")
-    } else {
-        Ok(Config::default())
-    }
-}
-
-fn find_project_config() -> Option<PathBuf> {
-    let dir = std::env::current_dir().ok()?;
-    let mut current = dir.as_path();
-    loop {
-        let candidate = current.join(".codereviewer.toml");
-        if candidate.is_file() {
-            return Some(candidate);
-        }
-        match current.parent() {
-            Some(parent) => current = parent,
-            None => return None,
-        }
-    }
 }
 
 fn parse_severity(s: &str) -> Option<Severity> {

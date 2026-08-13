@@ -53,6 +53,16 @@ impl Report {
                 self.result.files_skipped, self.result.files_skipped
             ));
         }
+        out.push('\n');
+        for (file, err) in &self.result.parse_errors {
+            out.push_str(&format!(
+                "解析失败 {}：{} | parse failed {}: {}\n",
+                file.display(),
+                err,
+                file.display(),
+                err
+            ));
+        }
         out
     }
 
@@ -62,6 +72,7 @@ impl Report {
         struct Out<'a> {
             summary: Summary,
             findings: &'a [crate::finding::Finding],
+            parse_errors: Vec<ParseErrorOut>,
         }
         #[derive(serde::Serialize)]
         struct Summary {
@@ -69,6 +80,12 @@ impl Report {
             warnings: usize,
             infos: usize,
             files: usize,
+            skipped: usize,
+        }
+        #[derive(serde::Serialize)]
+        struct ParseErrorOut {
+            file: std::path::PathBuf,
+            error: String,
         }
         let out = Out {
             summary: Summary {
@@ -76,8 +93,18 @@ impl Report {
                 warnings: w,
                 infos: i,
                 files: self.result.files_scanned,
+                skipped: self.result.files_skipped,
             },
             findings: &self.result.findings,
+            parse_errors: self
+                .result
+                .parse_errors
+                .iter()
+                .map(|(f, err)| ParseErrorOut {
+                    file: f.clone(),
+                    error: err.to_string(),
+                })
+                .collect(),
         };
         serde_json::to_string_pretty(&out).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))
     }

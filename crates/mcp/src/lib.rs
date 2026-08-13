@@ -30,7 +30,9 @@ impl CodeReviewerServer {
         Parameters(ReviewParams { path }): Parameters<ReviewParams>,
     ) -> Result<String, rmcp::ErrorData> {
         let rules = codereviewer_rules::all_rules();
-        let analyzer = Analyzer::new(rules, Config::default());
+        let config = Config::load_auto()
+            .map_err(|e| rmcp::ErrorData::internal_error(format!("failed to load config: {e}"), None))?;
+        let analyzer = Analyzer::new(rules, config);
         let result = analyzer
             .analyze_path(&PathBuf::from(&path))
             .map_err(|e| rmcp::ErrorData::internal_error(e.to_string(), None))?;

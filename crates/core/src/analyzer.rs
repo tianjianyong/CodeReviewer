@@ -43,14 +43,7 @@ impl Analyzer {
         let files = collect_files(path, &self.config);
         for file in files {
             match parse_file(&file) {
-                Ok((tree, language)) => {
-                    let source = match std::fs::read_to_string(&file) {
-                        Ok(s) => s,
-                        Err(_) => {
-                            files_skipped += 1;
-                            continue;
-                        }
-                    };
+                Ok((tree, language, source)) => {
                     for rule in &self.rules {
                         if !self.rule_enabled(rule.id()) {
                             continue;
@@ -140,28 +133,29 @@ fn collect_files(path: &Path, config: &Config) -> Vec<PathBuf> {
         return vec![path.to_path_buf()];
     }
     let mut out = Vec::new();
-    walk(path, config, &mut out);
-    out
-}
-
-fn walk(dir: &Path, config: &Config, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    let builtin = default_excludes();
-    let gitignore_patterns = parse_gitignore(&dir.join(".gitignore"));
-    let all_patterns: Vec<String> = builtin
+    // 内置默认排除 + 用户配置排除：只算一次，向下递归传递
+    let base_patterns: Vec<String> = default_excludes()
         .iter()
         .map(|s| s.to_string())
         .chain(config.global.exclude.iter().cloned())
-        .chain(gitignore_patterns)
         .collect();
-    let pattern_refs: Vec<&str> = all_patterns.iter().map(String::as_str).collect();
+    walk(path, &base_patterns, &mut out);
+    out
+}
+
+fn walk(dir: &Path, inherited: &[String], out: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    // 父级模式 + 本级 .gitignore，向下传递（.gitignore 应继承到子目录）
+    let mut patterns = inherited.to_vec();
+    patterns.extend(parse_gitignore(&dir.join(".gitignore")));
+    let pattern_refs: Vec<&str> = patterns.iter().map(String::as_str).collect();
     for entry in entries.flatten() {
         let p = entry.path();
         if p.is_dir() {
             if !is_excluded(&p, &pattern_refs) {
-                walk(&p, config, out);
+                walk(&p, &patterns, out);
             }
         } else if p.is_file() && crate::parser::Language::from_path(&p).is_some() {
             if !is_excluded(&p, &pattern_refs) {

@@ -1,8 +1,9 @@
 //! Finding: 一次检测发现的数据结构。
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
+use tree_sitter::Node;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -47,4 +48,35 @@ pub struct Finding {
     pub location: Location,
     pub message: String,
     pub snippet: Option<String>,
+}
+
+impl Finding {
+    /// 从规则元信息与 AST 节点构造 finding，snippet 自动取节点起始行。
+    pub fn new(
+        rule_id: &'static str,
+        rule_name: &'static str,
+        severity: Severity,
+        file: &Path,
+        node: &Node,
+        source: &str,
+        message: String,
+    ) -> Self {
+        let pos = node.start_position();
+        let snippet = source
+            .lines()
+            .nth(pos.row)
+            .map(|l| l.trim_end().to_string());
+        Finding {
+            rule_id,
+            rule_name,
+            severity,
+            location: Location {
+                file: file.to_path_buf(),
+                line: pos.row + 1,
+                column: pos.column + 1,
+            },
+            message,
+            snippet,
+        }
+    }
 }

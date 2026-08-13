@@ -51,4 +51,28 @@ impl Config {
         let text = std::fs::read_to_string(path)?;
         toml::from_str(&text).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
     }
+
+    /// 从当前目录向上查找 .codereviewer.toml 并加载；找不到返回默认配置。
+    pub fn load_auto() -> Result<Self, std::io::Error> {
+        match Self::find_project_config() {
+            Some(p) => Self::load_from_file(&p),
+            None => Ok(Self::default()),
+        }
+    }
+
+    /// 从当前目录向上查找 .codereviewer.toml。
+    pub fn find_project_config() -> Option<std::path::PathBuf> {
+        let dir = std::env::current_dir().ok()?;
+        let mut current = dir.as_path();
+        loop {
+            let candidate = current.join(".codereviewer.toml");
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+            match current.parent() {
+                Some(parent) => current = parent,
+                None => return None,
+            }
+        }
+    }
 }
