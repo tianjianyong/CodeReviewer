@@ -64,9 +64,6 @@ impl Analyzer {
                             rule.analyze(&ctx)
                         })) {
                             Ok(Ok(mut found)) => findings.append(&mut found),
-                            Ok(Err(RuleError::Failed(msg))) => {
-                                findings.push(self.rule_failure_finding(&**rule, &file, &msg));
-                            }
                             Ok(Err(RuleError::Panic)) => {
                                 findings.push(self.rule_failure_finding(&**rule, &file, "panicked"));
                             }

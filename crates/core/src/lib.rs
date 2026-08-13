@@ -6,7 +6,6 @@ pub mod analyzer;
 pub mod ast;
 pub mod config;
 pub mod finding;
-pub mod llm;
 pub mod parser;
 pub mod reporter;
 pub mod rule;

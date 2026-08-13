@@ -10,8 +10,6 @@ use tree_sitter::Tree;
 
 #[derive(Debug, Error)]
 pub enum RuleError {
-    #[error("rule failed: {0}")]
-    Failed(String),
     #[error("rule panicked")]
     Panic,
 }
