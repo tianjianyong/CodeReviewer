@@ -1,0 +1,54 @@
+# Changelog
+
+本项目的所有重要变更都记录在此文件中。
+
+格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
+版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。当前版本号见 [VERSION.md](VERSION.md)。
+
+## [Unreleased]
+
+### 修复（Fixed）
+
+- 排除规则按子串匹配误伤正常文件（`combine.py` 被 "bin" 模式命中），改为按路径组件名匹配
+- 扫描不存在的路径静默成功（0 findings + exit 0），现在报错并非零退出
+- CLI `--severity`/`--rules`/`--format` 无效值静默忽略，现在报错退出
+- 退出码恒为 0，现在有 error 级 finding 时 exit 1（CI 门禁可用）
+- R07 死代码：Python 点号导入（`import os.path`）误报；TS 默认/命名空间导入漏报；Java 通配符导入误报；import 语句自身标识符污染"已使用"集合导致普通未使用 import 从未被报
+- R19 N+1：Python 版取循环变量而非可迭代对象，规则从未生效
+- R23 错误类型传播：异常变量检查在 catch 头部而非函数体；Python `except Exception as e` 的 `as_pattern` 结构导致变量提取为空，带异常变量的分支从未生效
+- R06 过度设计：泛型 impl 匹配字符串错误（`impl<T> Trait` 不识别），改为按 AST 提取 trait 名并排除固有 impl
+- R08 TODO：C# comment 节点种类混入 `extern_alias_directive`
+- 解析失败的文件在报告中不可见，现在文本/JSON 都输出 `parse_errors` 与跳过计数
+
+### 变更（Changed）
+
+- 抽取共享 `core::ast` 工具（`walk`/`node_text`/`line_of`）与 `Finding::new`（自动带 snippet），规则层净减 334 行
+- 文件只读一次；`.gitignore` 模式继承到子目录；排除模式每次扫描只计算一次
+- MCP server 与 CLI 共用 `.codereviewer.toml` 配置加载（此前 MCP 恒用默认配置）
+- JSON 输出新增 `snippet`、`skipped`、`parse_errors` 字段
+- 规则声明语言与实现对齐：R18/R19/R20 仅 Python/TS/TSX，R23 不含 Rust，R28 仅 Rust/TS/TSX
+- 文件级并行分析（rayon），输出顺序保持确定性
+- r02 嵌套深度改为迭代实现（消除深 AST 递归栈溢出风险）
+- clippy 告警清零；新增 CI workflow（clippy + test + release build）
+- 新增 MIT LICENSE；MCP 配置命令改为跨平台的 `cargo run` 形式
+
+### 移除（Removed）
+
+- `core::llm` Phase 2 占位模块（无实现、无调用者）
+- `RuleError::Failed`（无任何规则构造过）
+- `core::VERSION` 死常量（版本由 `Cargo.toml` + `VERSION.md` 维护，测试保证一致）
+
+## [0.1.0] - 2026-06-22
+
+首个 MVP 版本。
+
+### 新增（Added）
+
+- CLI：`check <path>`（`--format`/`--rules`/`--severity`）与 `list-rules` 子命令
+- MCP server（stdio）：`review` 与 `list_rules` 工具
+- tree-sitter 多语言解析：Rust、Python、TypeScript/TSX、C#、Java
+- 基础规则 R01–R10：回退掩盖、结构臃肿、文档缺失、测试简单、浅集成测试、过度设计、死代码、TODO 堆积、注释代码、魔法数字
+- AI 代码专项规则 R14/R15/R16/R18/R19/R20/R23/R24/R28（候选清单见 `docs/design/rule-candidates.md`）
+- TOML 配置（`.codereviewer.toml`）：规则启停、阈值覆盖、项目排除目录
+- 内置默认排除目录与 `.gitignore` 读取
+- 终端彩色/文本与 JSON 两种报告格式
