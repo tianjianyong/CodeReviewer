@@ -148,3 +148,11 @@ enabled = false
 - tree-sitter 多语言解析
 - rmcp (MCP Rust SDK)
 - TOML 配置驱动
+
+## 发版流程
+
+1. 同时更新 `Cargo.toml`（workspace `version`）与 `VERSION.md`——两者必须一致，测试 `version_matches_version_md` 会拦截不一致
+2. 把 `CHANGELOG.md` 的 `[Unreleased]` 转成带日期的版本节（`[x.y.z] - YYYY-MM-DD`）
+3. `cargo test --workspace` 全绿
+4. 打 tag：`git tag v<版本号>`（如 `git tag v0.1.0`）
+5. `cargo build --release` 构建产物作为 release asset 发布，不要提交进仓库
