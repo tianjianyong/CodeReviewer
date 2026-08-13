@@ -17,6 +17,13 @@ pwsh -Command "./target/release/codereviewer check src/"
 # JSON 输出（给脚本或 AI 用）
 pwsh -Command "./target/release/codereviewer check src/ --format json"
 
+# Markdown 汇总报告（统计 + 最严重问题 + 修复建议 + 重灾区文件）
+pwsh -Command "./target/release/codereviewer check src/ --format md"
+
+# 报告写入文件（默认打印到终端）
+pwsh -Command "./target/release/codereviewer check src/ --format md --output report.md"
+pwsh -Command "./target/release/codereviewer check src/ --format json --output report.json"
+
 # 只运行指定规则
 pwsh -Command "./target/release/codereviewer check src/ --rules R01,R02"
 

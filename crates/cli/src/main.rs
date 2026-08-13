@@ -21,9 +21,12 @@ enum Command {
     Check {
         /// Path to scan (file or directory)
         path: PathBuf,
-        /// Output format: text or json
+        /// Output format: text, md (summary) or json (machine-readable)
         #[arg(long, default_value = "text")]
         format: String,
+        /// Write the report to a file instead of stdout
+        #[arg(long)]
+        output: Option<PathBuf>,
         /// Optional config file path
         #[arg(long)]
         config: Option<PathBuf>,
@@ -44,13 +47,14 @@ fn main() -> Result<()> {
         Command::Check {
             path,
             format,
+            output,
             config,
             rules,
             severity,
         } => {
-            if !matches!(format.as_str(), "text" | "json") {
+            if !matches!(format.as_str(), "text" | "json" | "md") {
                 bail!(
-                    "无效输出格式：{format}（可选 text/json） | invalid format: {format} (text/json)"
+                    "无效输出格式：{format}（可选 text/json/md） | invalid format: {format} (text/json/md)"
                 );
             }
             let cfg = match config.as_deref() {
@@ -87,16 +91,24 @@ fn main() -> Result<()> {
                 result.findings.retain(|f| f.severity <= min);
             }
             let report = Report { result };
-            match format.as_str() {
-                "json" => println!("{}", report.render_json()),
+            let rendered = match format.as_str() {
+                "json" => report.render_json(),
+                "md" => report.render_markdown(&path),
                 _ => {
-                    let is_tty = std::io::IsTerminal::is_terminal(&std::io::stdout());
-                    if is_tty {
-                        println!("{}", report.render_text_colored());
+                    // 写文件时禁用颜色，避免 ANSI 码混入
+                    let color =
+                        output.is_none() && std::io::IsTerminal::is_terminal(&std::io::stdout());
+                    if color {
+                        report.render_text_colored()
                     } else {
-                        println!("{}", report.render_text());
+                        report.render_text()
                     }
                 }
+            };
+            if let Some(out_path) = &output {
+                std::fs::write(out_path, rendered).context("failed to write report")?;
+            } else {
+                println!("{rendered}");
             }
             // 有 error 级 finding 时非零退出，供 CI 门禁使用
             if report

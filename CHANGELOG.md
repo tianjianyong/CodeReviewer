@@ -28,6 +28,7 @@
 - 文件只读一次；`.gitignore` 模式继承到子目录；排除模式每次扫描只计算一次
 - MCP server 与 CLI 共用 `.codereviewer.toml` 配置加载（此前 MCP 恒用默认配置）；配置发现锚定扫描路径（向上一层查找，回退当前目录）
 - JSON 输出新增 `snippet`、`skipped`、`parse_errors` 字段
+- 新增 `--format md` 汇总报告（统计 + error 级问题分组 + 修复建议 + 重灾区文件）与 `--output <file>` 报告落盘（详细报告用 `--format json --output`）
 - 规则声明语言与实现对齐：R18/R19/R20 仅 Python/TS/TSX，R23 不含 Rust，R28 仅 Rust/TS/TSX
 - 文件级并行分析（rayon），输出顺序保持确定性
 - r02 嵌套深度改为迭代实现（消除深 AST 递归栈溢出风险）
