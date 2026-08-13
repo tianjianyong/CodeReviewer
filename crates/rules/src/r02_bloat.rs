@@ -71,8 +71,8 @@ impl Rule for StructuralBloat {
                     ));
                 }
 
-                if let Some(params) = parameter_count(node, ctx.language) {
-                    if params > max_params {
+                if let Some(params) = parameter_count(node, ctx.language)
+                    && params > max_params {
                         findings.push(Finding::new(
                             "R02",
                             "structural-bloat",
@@ -86,7 +86,6 @@ impl Rule for StructuralBloat {
                             ),
                         ));
                     }
-                }
 
                 let depth = max_nesting_depth(node);
                 if depth > max_nesting {
@@ -161,20 +160,6 @@ fn is_parameter_node(node: &tree_sitter::Node, lang: Language) -> bool {
 }
 
 fn max_nesting_depth(node: tree_sitter::Node) -> usize {
-    fn depth(n: tree_sitter::Node, nesting_kinds: &[&str]) -> usize {
-        let mut max = 0;
-        let mut cursor = n.walk();
-        for child in n.children(&mut cursor) {
-            if nesting_kinds.contains(&child.kind()) {
-                max = max.max(depth(child, nesting_kinds));
-            }
-        }
-        if nesting_kinds.contains(&n.kind()) {
-            1 + max
-        } else {
-            max
-        }
-    }
     let nesting_kinds = [
         "if_statement",
         "if_expression",
@@ -188,5 +173,20 @@ fn max_nesting_depth(node: tree_sitter::Node) -> usize {
         "with_statement",
         "switch_statement",
     ];
-    depth(node, &nesting_kinds)
+    // 迭代式遍历：深度向下传递，避免深层 AST 递归栈溢出
+    let mut max = 0;
+    let mut stack: Vec<(tree_sitter::Node, usize)> = vec![(node, 0)];
+    while let Some((n, depth)) = stack.pop() {
+        let cur = if nesting_kinds.contains(&n.kind()) {
+            depth + 1
+        } else {
+            depth
+        };
+        max = max.max(cur);
+        let mut cursor = n.walk();
+        for child in n.children(&mut cursor) {
+            stack.push((child, cur));
+        }
+    }
+    max
 }

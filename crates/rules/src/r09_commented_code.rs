@@ -44,7 +44,7 @@ impl Rule for CommentedCode {
                 while i < lines.len() {
                     let t = lines[i].trim_start();
                     if t.starts_with(comment_prefix) {
-                        let content = t[comment_prefix.len()..].trim();
+                        let content = t.strip_prefix(comment_prefix).unwrap_or(t).trim();
                         if looks_like_code(content) {
                             count += 1;
                             i += 1;

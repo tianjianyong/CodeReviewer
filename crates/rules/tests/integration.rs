@@ -101,7 +101,7 @@ fn test_json_output_format() {
     assert!(parsed["summary"]["errors"].as_u64().unwrap() >= 1);
     assert!(parsed["summary"]["files"].as_u64().unwrap() == 1);
     assert!(parsed["findings"].is_array());
-    assert!(parsed["findings"].as_array().unwrap().len() > 0);
+    assert!(!parsed["findings"].as_array().unwrap().is_empty());
 
     for f in parsed["findings"].as_array().unwrap() {
         assert!(f["rule_id"].is_string());

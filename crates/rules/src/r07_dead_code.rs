@@ -106,8 +106,8 @@ fn extract_import_names(text: &str, lang: Language) -> Vec<String> {
         }
         Language::Python => {
             let text = text.trim();
-            if text.starts_with("from ") {
-                if let Some(pos) = text.find(" import ") {
+            if text.starts_with("from ")
+                && let Some(pos) = text.find(" import ") {
                     let names = &text[pos + 8..];
                     return names
                         .split(',')
@@ -115,9 +115,7 @@ fn extract_import_names(text: &str, lang: Language) -> Vec<String> {
                         .filter(|s| !s.is_empty())
                         .collect();
                 }
-            }
-            if text.starts_with("import ") {
-                let names = &text[7..];
+            if let Some(names) = text.strip_prefix("import ") {
                 return names
                     .split(',')
                     .map(|s| s.trim().split(" as ").last().unwrap_or("").trim().to_string())

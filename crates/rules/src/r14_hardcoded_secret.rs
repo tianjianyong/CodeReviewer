@@ -193,8 +193,8 @@ fn enclosing_var_name(node: &tree_sitter::Node, ctx: &AnalysisContext) -> String
 fn strip_quotes(s: &str) -> &str {
     let s = s.trim();
     let s = s.strip_prefix('"').and_then(|x| x.strip_suffix('"')).unwrap_or(s);
-    let s = s.strip_prefix('\'').and_then(|x| x.strip_suffix('\'')).unwrap_or(s);
-    s
+    
+    (s.strip_prefix('\'').and_then(|x| x.strip_suffix('\'')).unwrap_or(s)) as _
 }
 
 fn literal_kinds(lang: Language) -> &'static [&'static str] {

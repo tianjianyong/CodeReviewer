@@ -2,6 +2,8 @@
 
 use std::path::{Path, PathBuf};
 
+use rayon::prelude::*;
+
 use crate::config::Config;
 use crate::finding::{Finding, Severity};
 use crate::parser::{parse_file, ParseError};
@@ -21,6 +23,13 @@ pub struct AnalysisResult {
     pub parse_errors: Vec<(PathBuf, ParseError)>,
 }
 
+/// 单个文件的分析结果（并行阶段产出，主线程合并）。
+struct FileOutcome {
+    file: PathBuf,
+    findings: Vec<Finding>,
+    parse_error: Option<ParseError>,
+}
+
 pub struct Analyzer {
     rules: Vec<Box<dyn Rule>>,
     config: Config,
@@ -35,48 +44,27 @@ impl Analyzer {
         if !path.exists() {
             return Err(AnalyzerError::NotFound(path.to_path_buf()));
         }
+
+        let files = collect_files(path, &self.config);
+        // 文件级并行：parse + 规则分析互不共享状态，结果保持输入顺序
+        let outcomes: Vec<FileOutcome> = files
+            .par_iter()
+            .map(|file| self.analyze_file(file))
+            .collect();
+
         let mut findings = Vec::new();
         let mut files_scanned = 0usize;
         let mut files_skipped = 0usize;
         let mut parse_errors = Vec::new();
-
-        let files = collect_files(path, &self.config);
-        for file in files {
-            match parse_file(&file) {
-                Ok((tree, language, source)) => {
-                    for rule in &self.rules {
-                        if !self.rule_enabled(rule.id()) {
-                            continue;
-                        }
-                        if !rule.languages().contains(&language) {
-                            continue;
-                        }
-                        let default_config = crate::config::RuleConfig::default();
-                        let rule_config = self.config.rules.get(rule.id()).unwrap_or(&default_config);
-                        let ctx = AnalysisContext {
-                            source: &source,
-                            tree: &tree,
-                            language,
-                            file_path: &file,
-                            rule_config,
-                        };
-                        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                            rule.analyze(&ctx)
-                        })) {
-                            Ok(Ok(mut found)) => findings.append(&mut found),
-                            Ok(Err(RuleError::Panic)) => {
-                                findings.push(self.rule_failure_finding(&**rule, &file, "panicked"));
-                            }
-                            Err(_) => {
-                                findings.push(self.rule_failure_finding(&**rule, &file, "panicked"));
-                            }
-                        }
-                    }
-                    files_scanned += 1;
-                }
-                Err(e) => {
-                    parse_errors.push((file.clone(), e));
+        for o in outcomes {
+            match o.parse_error {
+                Some(e) => {
+                    parse_errors.push((o.file, e));
                     files_skipped += 1;
+                }
+                None => {
+                    findings.extend(o.findings);
+                    files_scanned += 1;
                 }
             }
         }
@@ -94,6 +82,53 @@ impl Analyzer {
             files_skipped,
             parse_errors,
         })
+    }
+
+    /// 分析单个文件：解析 + 跑所有适用规则。
+    fn analyze_file(&self, file: &Path) -> FileOutcome {
+        match parse_file(file) {
+            Ok((tree, language, source)) => {
+                let mut findings = Vec::new();
+                for rule in &self.rules {
+                    if !self.rule_enabled(rule.id()) {
+                        continue;
+                    }
+                    if !rule.languages().contains(&language) {
+                        continue;
+                    }
+                    let default_config = crate::config::RuleConfig::default();
+                    let rule_config = self.config.rules.get(rule.id()).unwrap_or(&default_config);
+                    let ctx = AnalysisContext {
+                        source: &source,
+                        tree: &tree,
+                        language,
+                        file_path: file,
+                        rule_config,
+                    };
+                    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        rule.analyze(&ctx)
+                    })) {
+                        Ok(Ok(mut found)) => findings.append(&mut found),
+                        Ok(Err(RuleError::Panic)) => {
+                            findings.push(self.rule_failure_finding(&**rule, file, "panicked"));
+                        }
+                        Err(_) => {
+                            findings.push(self.rule_failure_finding(&**rule, file, "panicked"));
+                        }
+                    }
+                }
+                FileOutcome {
+                    findings,
+                    parse_error: None,
+                    file: file.to_path_buf(),
+                }
+            }
+            Err(e) => FileOutcome {
+                findings: Vec::new(),
+                parse_error: Some(e),
+                file: file.to_path_buf(),
+            },
+        }
     }
 
     fn rule_enabled(&self, rule_id: &str) -> bool {
@@ -154,11 +189,10 @@ fn walk(dir: &Path, inherited: &[String], out: &mut Vec<PathBuf>) {
             if !is_excluded(&p, &pattern_refs) {
                 walk(&p, &patterns, out);
             }
-        } else if p.is_file() && crate::parser::Language::from_path(&p).is_some() {
-            if !is_excluded(&p, &pattern_refs) {
+        } else if p.is_file() && crate::parser::Language::from_path(&p).is_some()
+            && !is_excluded(&p, &pattern_refs) {
                 out.push(p);
             }
-        }
     }
 }
 

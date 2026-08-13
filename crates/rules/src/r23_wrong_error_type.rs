@@ -46,7 +46,7 @@ impl Rule for WrongErrorTypePropagation {
             let body_text = node_text(&node, ctx.source);
             let exc_var = exception_var(&node, ctx);
             // 头部之后的体内按词边界引用了异常变量 → 在用信息，不报
-            if !exc_var.is_empty() && body_uses_word(&body_text, &exc_var) {
+            if !exc_var.is_empty() && body_uses_word(body_text, &exc_var) {
                 return;
             }
             if returns_generic(&node, ctx) {

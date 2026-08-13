@@ -82,10 +82,10 @@ fn find_ts_nplus1(ctx: &AnalysisContext, findings: &mut Vec<Finding>) {
             return;
         }
         // 源是 DB 查询结果
-        if !is_ts_query_source(&text) {
+        if !is_ts_query_source(text) {
             return;
         }
-        if has_ts_prefetch(&text) {
+        if has_ts_prefetch(text) {
             return;
         }
         // 箭头函数体内访问 x.<field>

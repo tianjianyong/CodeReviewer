@@ -159,11 +159,10 @@ fn has_test_attribute_as_prev_sibling(node: &tree_sitter::Node, ctx: &AnalysisCo
 
 fn extract_function_name(node: &tree_sitter::Node, ctx: &AnalysisContext) -> String {
     // TS call_expression: 名字是 callee（如 test/it）
-    if ctx.language == Language::TypeScript || ctx.language == Language::TypeScriptTsx {
-        if node.kind() == "call_expression" {
+    if (ctx.language == Language::TypeScript || ctx.language == Language::TypeScriptTsx)
+        && node.kind() == "call_expression" {
             return callee_identifier(node, ctx).unwrap_or("").to_string();
         }
-    }
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
         if child.kind() == "identifier" {
@@ -193,13 +192,11 @@ fn count_assertions(node: &tree_sitter::Node, ctx: &AnalysisContext) -> usize {
 fn count_expect_calls(node: &tree_sitter::Node, ctx: &AnalysisContext) -> usize {
     let mut count = 0;
     walk(*node, &mut |n| {
-        if n.kind() == "call_expression" {
-            if let Some(callee) = callee_identifier(&n, ctx) {
-                if matches!(callee, "expect" | "assert") {
+        if n.kind() == "call_expression"
+            && let Some(callee) = callee_identifier(&n, ctx)
+                && matches!(callee, "expect" | "assert") {
                     count += 1;
                 }
-            }
-        }
     });
     count
 }

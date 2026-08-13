@@ -48,7 +48,7 @@ impl Rule for MissingInputValidation {
                 return;
             }
             let body_text = node_text(&node, ctx.source);
-            let has_guard = has_validation_guard(&body_text, ctx.language);
+            let has_guard = has_validation_guard(body_text, ctx.language);
             if has_guard {
                 return;
             }

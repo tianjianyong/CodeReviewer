@@ -97,11 +97,10 @@ fn classify(s: &str) -> Option<Kind> {
     if s == "https://" || s == "http://" || s == "/**" || s == "/*" {
         return None;
     }
-    if s.starts_with("https://") || s.starts_with("http://") {
-        if !is_localhost_url(s) {
+    if (s.starts_with("https://") || s.starts_with("http://"))
+        && !is_localhost_url(s) {
             return Some(Kind::Url);
         }
-    }
     if is_absolute_path(s) {
         return Some(Kind::Path);
     }
@@ -133,8 +132,8 @@ fn is_absolute_path(s: &str) -> bool {
 fn strip_quotes(s: &str) -> &str {
     let s = s.trim();
     let s = s.strip_prefix('"').and_then(|x| x.strip_suffix('"')).unwrap_or(s);
-    let s = s.strip_prefix('\'').and_then(|x| x.strip_suffix('\'')).unwrap_or(s);
-    s
+    
+    (s.strip_prefix('\'').and_then(|x| x.strip_suffix('\'')).unwrap_or(s)) as _
 }
 
 fn env_signals(lang: Language) -> Vec<&'static str> {

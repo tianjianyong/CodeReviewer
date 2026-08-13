@@ -126,11 +126,10 @@ fn collect_async_fn_names(ctx: &AnalysisContext) -> HashSet<String> {
         }
         // Python: async def foo  →  function_definition 前有 'async' 关键字
         let text = node_text(&node, ctx.source);
-        if text.starts_with("async def") || text.starts_with("asyncdef") {
-            if let Some(name) = extract_fn_name(&node, ctx) {
+        if (text.starts_with("async def") || text.starts_with("asyncdef"))
+            && let Some(name) = extract_fn_name(&node, ctx) {
                 names.insert(name);
             }
-        }
     });
     names
 }
@@ -140,13 +139,12 @@ fn collect_ts_async_names(ctx: &AnalysisContext) -> HashSet<String> {
     walk(ctx.tree.root_node(), &mut |node| {
         let text = node_text(&node, ctx.source);
         // async function foo( / async foo( / const foo = async (
-        if node.kind() == "function_declaration" && text.starts_with("async function") {
-            if let Some(name) = extract_fn_name(&node, ctx) {
+        if node.kind() == "function_declaration" && text.starts_with("async function")
+            && let Some(name) = extract_fn_name(&node, ctx) {
                 names.insert(name);
             }
-        }
-        if node.kind() == "variable_declaration" || node.kind() == "lexical_declaration" {
-            if text.contains("async") {
+        if (node.kind() == "variable_declaration" || node.kind() == "lexical_declaration")
+            && text.contains("async") {
                 // const foo = async () =>  → 找 identifier
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
@@ -160,7 +158,6 @@ fn collect_ts_async_names(ctx: &AnalysisContext) -> HashSet<String> {
                     }
                 }
             }
-        }
     });
     names
 }
