@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use clap::{Parser as ClapParser, Subcommand};
 
 use codereviewer_core::analyzer::Analyzer;
@@ -45,11 +45,30 @@ fn main() -> Result<()> {
             let cfg = load_config(config.as_deref())?;
             let mut all_rules = codereviewer_rules::all_rules();
             if let Some(filter) = &rules {
+                let unknown: Vec<&str> = filter
+                    .iter()
+                    .map(String::as_str)
+                    .filter(|f| !all_rules.iter().any(|r| r.id() == *f))
+                    .collect();
+                if !unknown.is_empty() {
+                    bail!(
+                        "未知规则 ID：{} | unknown rule id(s): {}",
+                        unknown.join(", "),
+                        unknown.join(", ")
+                    );
+                }
                 all_rules.retain(|r| filter.iter().any(|f| r.id() == f));
             }
-            let min_severity = severity.as_deref().and_then(parse_severity);
+            let min_severity = match severity.as_deref() {
+                Some(s) => Some(
+                    parse_severity(s).with_context(|| {
+                        format!("无效严重级：{s}（可选 error/warning/info） | invalid severity: {s} (error/warning/info)")
+                    })?,
+                ),
+                None => None,
+            };
             let analyzer = Analyzer::new(all_rules, cfg);
-            let mut result = analyzer.analyze_path(&path);
+            let mut result = analyzer.analyze_path(&path)?;
             if let Some(min) = min_severity {
                 result.findings.retain(|f| f.severity <= min);
             }
@@ -64,6 +83,15 @@ fn main() -> Result<()> {
                         println!("{}", report.render_text());
                     }
                 }
+            }
+            // 有 error 级 finding 时非零退出，供 CI 门禁使用
+            if report
+                .result
+                .findings
+                .iter()
+                .any(|f| f.severity == Severity::Error)
+            {
+                std::process::exit(1);
             }
         }
         Command::ListRules => {

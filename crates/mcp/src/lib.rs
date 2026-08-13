@@ -31,7 +31,9 @@ impl CodeReviewerServer {
     ) -> Result<String, rmcp::ErrorData> {
         let rules = codereviewer_rules::all_rules();
         let analyzer = Analyzer::new(rules, Config::default());
-        let result = analyzer.analyze_path(&PathBuf::from(&path));
+        let result = analyzer
+            .analyze_path(&PathBuf::from(&path))
+            .map_err(|e| rmcp::ErrorData::internal_error(e.to_string(), None))?;
         let report = Report { result };
         Ok(report.render_json())
     }

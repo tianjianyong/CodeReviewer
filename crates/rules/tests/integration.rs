@@ -21,7 +21,7 @@ fn test_sample_rust_finds_bloat() {
     let rules = codereviewer_rules::all_rules();
     let analyzer = Analyzer::new(rules, Config::default());
     let path = fixtures_dir().join("sample_rust.rs");
-    let result = analyzer.analyze_path(&path);
+    let result = analyzer.analyze_path(&path).expect("analyze failed");
 
     let r02: Vec<_> = result.findings.iter().filter(|f| f.rule_id == "R02").collect();
     assert!(!r02.is_empty(), "should find R02 bloat in sample_rust.rs");
@@ -33,7 +33,7 @@ fn test_problematic_finds_multiple_rule_types() {
     let rules = codereviewer_rules::all_rules();
     let analyzer = Analyzer::new(rules, Config::default());
     let path = fixtures_dir().join("problematic.rs");
-    let result = analyzer.analyze_path(&path);
+    let result = analyzer.analyze_path(&path).expect("analyze failed");
 
     let rule_ids: Vec<&str> = result.findings.iter().map(|f| f.rule_id).collect();
     assert!(rule_ids.contains(&"R01"), "should find R01 fallback");
@@ -51,7 +51,7 @@ fn test_r10_skips_test_files() {
     let analyzer = Analyzer::new(rules, Config::default());
     // problematic.rs is under tests/fixtures/ -> R10 should be skipped
     let path = fixtures_dir().join("problematic.rs");
-    let result = analyzer.analyze_path(&path);
+    let result = analyzer.analyze_path(&path).expect("analyze failed");
     let r10_count = result.findings.iter().filter(|f| f.rule_id == "R10").count();
     assert_eq!(r10_count, 0, "R10 should skip files under tests/ directory");
 }
@@ -61,7 +61,7 @@ fn test_problematic_has_errors() {
     let rules = codereviewer_rules::all_rules();
     let analyzer = Analyzer::new(rules, Config::default());
     let path = fixtures_dir().join("problematic.rs");
-    let result = analyzer.analyze_path(&path);
+    let result = analyzer.analyze_path(&path).expect("analyze failed");
 
     let errors: Vec<_> = result
         .findings
@@ -77,7 +77,7 @@ fn test_files_scanned_count() {
     let rules = codereviewer_rules::all_rules();
     let analyzer = Analyzer::new(rules, Config::default());
     let path = fixtures_dir().join("problematic.rs");
-    let result = analyzer.analyze_path(&path);
+    let result = analyzer.analyze_path(&path).expect("analyze failed");
     assert_eq!(result.files_scanned, 1);
     assert_eq!(result.files_skipped, 0);
 }
@@ -93,7 +93,7 @@ fn test_json_output_format() {
     let rules = codereviewer_rules::all_rules();
     let analyzer = Analyzer::new(rules, Config::default());
     let path = fixtures_dir().join("problematic.rs");
-    let result = analyzer.analyze_path(&path);
+    let result = analyzer.analyze_path(&path).expect("analyze failed");
     let report = codereviewer_core::reporter::Report { result };
     let json = report.render_json();
 

@@ -7,6 +7,13 @@ use crate::finding::{Finding, Severity};
 use crate::parser::{parse_file, ParseError};
 use crate::rule::{AnalysisContext, Rule, RuleError};
 
+/// 分析失败（如扫描路径不存在）。
+#[derive(Debug, thiserror::Error)]
+pub enum AnalyzerError {
+    #[error("path not found: {0}")]
+    NotFound(PathBuf),
+}
+
 pub struct AnalysisResult {
     pub findings: Vec<Finding>,
     pub files_scanned: usize,
@@ -24,7 +31,10 @@ impl Analyzer {
         Self { rules, config }
     }
 
-    pub fn analyze_path(&self, path: &Path) -> AnalysisResult {
+    pub fn analyze_path(&self, path: &Path) -> Result<AnalysisResult, AnalyzerError> {
+        if !path.exists() {
+            return Err(AnalyzerError::NotFound(path.to_path_buf()));
+        }
         let mut findings = Vec::new();
         let mut files_scanned = 0usize;
         let mut files_skipped = 0usize;
@@ -88,12 +98,12 @@ impl Analyzer {
                 .then(a.location.line.cmp(&b.location.line))
         });
 
-        AnalysisResult {
+        Ok(AnalysisResult {
             findings,
             files_scanned,
             files_skipped,
             parse_errors,
-        }
+        })
     }
 
     fn rule_enabled(&self, rule_id: &str) -> bool {
@@ -222,7 +232,6 @@ fn default_excludes() -> &'static [&'static str] {
 
 fn is_excluded(path: &Path, patterns: &[&str]) -> bool {
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-    let s = path.to_string_lossy();
     for pat in patterns {
         let pat = pat.trim_end_matches('/');
         // *.ext 后缀 glob
@@ -232,9 +241,34 @@ fn is_excluded(path: &Path, patterns: &[&str]) -> bool {
             }
             continue;
         }
-        if s.contains(pat) || name == pat {
+        if name == pat {
             return true;
         }
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exclude_matches_component_name_not_substring() {
+        let patterns: Vec<&str> = default_excludes().to_vec();
+        // 文件名/目录名含 "bin"、"out" 等子串但不等于模式名，不应被排除
+        assert!(!is_excluded(Path::new("src/combine.rs"), &patterns));
+        assert!(!is_excluded(Path::new("bin_utils/x.py"), &patterns));
+        assert!(!is_excluded(Path::new("router/x.ts"), &patterns));
+        // 目录/文件名与模式完全一致时才排除
+        assert!(is_excluded(Path::new("target"), &patterns));
+        assert!(is_excluded(Path::new("node_modules"), &patterns));
+    }
+
+    #[test]
+    fn exclude_supports_suffix_glob() {
+        let patterns = ["*.log", "*.tmp"];
+        assert!(is_excluded(Path::new("app.log"), &patterns));
+        assert!(is_excluded(Path::new("x.tmp"), &patterns));
+        assert!(!is_excluded(Path::new("log.txt"), &patterns));
+    }
 }
