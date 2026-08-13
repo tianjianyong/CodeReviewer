@@ -96,11 +96,21 @@ fn is_broad_catch(node: &tree_sitter::Node, ctx: &AnalysisContext) -> bool {
 }
 
 fn exception_var(node: &tree_sitter::Node, ctx: &AnalysisContext) -> String {
-    // catch (Exception e) → e;  except Exception as e → e
     let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
+    let children: Vec<tree_sitter::Node> = node.children(&mut cursor).collect();
+    // Python: "except Exception as e" 解析为 as_pattern 子节点
+    for child in &children {
+        if child.kind() == "as_pattern" {
+            let text = node_text(child, ctx.source);
+            if let Some(pos) = text.find(" as ") {
+                return text[pos + 4..].trim().to_string();
+            }
+        }
+    }
+    // C#/Java/TS: catch (Exception e) 的 e 是 identifier 子节点
+    for child in &children {
         if child.kind() == "identifier" {
-            let t = node_text(&child, ctx.source);
+            let t = node_text(child, ctx.source);
             // 跳过类型名 Exception/Throwable
             if !matches!(t, "Exception" | "Throwable" | "Error" | "BaseException") {
                 return t.to_string();
@@ -154,4 +164,33 @@ fn contains_word(text: &str, word: &str) -> bool {
         rest = &rest[pos + 1..];
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::analyze_source;
+
+    #[test]
+    fn broad_except_unused_var_flagged() {
+        let source = "def f():\n    try:\n        pass\n    except Exception as e:\n        return None\n";
+        let findings = analyze_source(&WrongErrorTypePropagation, source, Language::Python);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].rule_id, "R23");
+    }
+
+    #[test]
+    fn broad_except_var_used_not_flagged() {
+        let source = "def f():\n    try:\n        pass\n    except Exception as e:\n        print(e)\n        return None\n";
+        let findings = analyze_source(&WrongErrorTypePropagation, source, Language::Python);
+        assert!(findings.is_empty());
+    }
+
+    #[test]
+    fn contains_word_respects_boundaries() {
+        assert!(contains_word("print(e)", "e"));
+        assert!(!contains_word("return", "e"));
+        assert!(!contains_word("error", "e"));
+        assert!(contains_word("log_error(e)", "e"));
+    }
 }

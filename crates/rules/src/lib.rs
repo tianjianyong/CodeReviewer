@@ -65,3 +65,27 @@ pub fn all_rules() -> Vec<Box<dyn Rule>> {
         Box::new(OverlyDefensiveHandling),
     ]
 }
+
+#[cfg(test)]
+pub(crate) mod test_util {
+    use std::path::Path;
+
+    use codereviewer_core::config::RuleConfig;
+    use codereviewer_core::finding::Finding;
+    use codereviewer_core::parser::{parse, Language};
+    use codereviewer_core::rule::{AnalysisContext, Rule};
+
+    /// 解析源码并跑单条规则，返回 findings（规则单元测试用）。
+    pub fn analyze_source(rule: &dyn Rule, source: &str, language: Language) -> Vec<Finding> {
+        let tree = parse(source, language).expect("parse failed");
+        let cfg = RuleConfig::default();
+        let ctx = AnalysisContext {
+            source,
+            tree: &tree,
+            language,
+            file_path: Path::new("test"),
+            rule_config: &cfg,
+        };
+        rule.analyze(&ctx).expect("rule failed")
+    }
+}

@@ -106,6 +106,26 @@ fn extract_impl_trait_name(node: &tree_sitter::Node, ctx: &AnalysisContext) -> O
     })
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::analyze_source;
+
+    #[test]
+    fn generic_and_plain_impls_both_count() {
+        let source = "pub trait Convert { fn c(&self) -> i32; }\nimpl<T> Convert for Vec<T> { fn c(&self) -> i32 { 0 } }\nimpl Convert for i32 { fn c(&self) -> i32 { 0 } }\n";
+        assert!(analyze_source(&OverEngineering, source, Language::Rust).is_empty());
+    }
+
+    #[test]
+    fn single_impl_flagged_inherent_not_counted() {
+        let source = "pub trait Single { fn s(&self) -> i32; }\nimpl Single for i32 { fn s(&self) -> i32 { 0 } }\nimpl Config { fn x(&self) {} }\n";
+        let findings = analyze_source(&OverEngineering, source, Language::Rust);
+        assert_eq!(findings.len(), 1);
+        assert!(findings[0].message.contains("仅有 1 处实现"));
+    }
+}
+
 fn detect_excess_generics(ctx: &AnalysisContext) -> Vec<Finding> {
     let max_generics = ctx.rule_config.threshold_i64("max_generics", 3) as usize;
     let mut findings = Vec::new();

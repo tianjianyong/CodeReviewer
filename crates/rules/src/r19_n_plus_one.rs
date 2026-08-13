@@ -171,3 +171,23 @@ fn accesses_relation(func_node: &tree_sitter::Node, iter_var: &str, ctx: &Analys
     });
     found
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::analyze_source;
+
+    #[test]
+    fn python_queryset_loop_flagged() {
+        let source = "class Model:\n    objects = None\n\nfor x in Model.objects.all():\n    print(x.author)\n";
+        let findings = analyze_source(&NPlusOneQuery, source, Language::Python);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].rule_id, "R19");
+    }
+
+    #[test]
+    fn python_plain_list_loop_not_flagged() {
+        let source = "for x in items:\n    print(x.author)\n";
+        assert!(analyze_source(&NPlusOneQuery, source, Language::Python).is_empty());
+    }
+}
