@@ -111,7 +111,12 @@ fn has_doc_comment(node: &tree_sitter::Node, ctx: &AnalysisContext) -> bool {
     let mut prev = node.prev_sibling();
     while let Some(sibling) = prev {
         let kind = sibling.kind();
-        if kind == "line_comment" || kind == "block_comment" || kind == "documentation" {
+        // C#/Python/TS 的注释节点统一叫 comment（不分 line/block），必须包含
+        if kind == "line_comment"
+            || kind == "block_comment"
+            || kind == "documentation"
+            || kind == "comment"
+        {
             let text = node_text(&sibling, ctx.source);
             if text.starts_with("///")
                 || text.starts_with("/**")
@@ -128,4 +133,18 @@ fn has_doc_comment(node: &tree_sitter::Node, ctx: &AnalysisContext) -> bool {
         }
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::analyze_source;
+
+    #[test]
+    fn csharp_doc_comments_are_recognized() {
+        let source = "/// <summary>有文档</summary>\npublic class Documented\n{\n    /// <summary>方法文档</summary>\n    public void WithDoc() { }\n    public void WithoutDoc() { }\n}\n";
+        let findings = analyze_source(&MissingDoc, source, Language::CSharp);
+        assert_eq!(findings.len(), 1, "只有无文档的方法应被报");
+        assert!(findings[0].message.contains("method_declaration"));
+    }
 }

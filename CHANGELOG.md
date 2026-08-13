@@ -18,6 +18,7 @@
 - R23 错误类型传播：异常变量检查在 catch 头部而非函数体；Python `except Exception as e` 的 `as_pattern` 结构导致变量提取为空，带异常变量的分支从未生效
 - R06 过度设计：泛型 impl 匹配字符串错误（`impl<T> Trait` 不识别），改为按 AST 提取 trait 名并排除固有 impl
 - R08 TODO：C# comment 节点种类混入 `extern_alias_directive`
+- R03 文档缺失：C# 注释节点类型是 `comment`（不分 line/block），has_doc_comment 未识别，写了 /// 的公开项照样被报（实测 2128 条中 1781 条为误报）；现已识别，附 C# 单测
 - R10 魔法字面量：跳过含 CJK 汉字的字符串（UI 文案是人类可读文本，非魔法常量），数字与 ASCII 编码/协议串仍报
 - 解析失败的文件在报告中不可见，现在文本/JSON 都输出 `parse_errors` 与跳过计数
 
