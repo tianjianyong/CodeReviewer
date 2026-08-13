@@ -13,7 +13,7 @@
 - 扫描不存在的路径静默成功（0 findings + exit 0），现在报错并非零退出
 - CLI `--severity`/`--rules`/`--format` 无效值静默忽略，现在报错退出
 - 退出码恒为 0，现在有 error 级 finding 时 exit 1（CI 门禁可用）
-- R07 死代码：Python 点号导入（`import os.path`）误报；TS 默认/命名空间导入漏报；Java 通配符导入误报；import 语句自身标识符污染"已使用"集合导致普通未使用 import 从未被报
+- R07 死代码：Python 点号导入（`import os.path`）误报；TS 默认/命名空间导入漏报；Java 通配符导入误报；import 语句自身标识符污染"已使用"集合导致普通未使用 import 从未被报；C# 移出支持列表（using 是命名空间，单文件名字匹配原理上不可行，此前几乎每文件误报）
 - R19 N+1：Python 版取循环变量而非可迭代对象，规则从未生效
 - R23 错误类型传播：异常变量检查在 catch 头部而非函数体；Python `except Exception as e` 的 `as_pattern` 结构导致变量提取为空，带异常变量的分支从未生效
 - R06 过度设计：泛型 impl 匹配字符串错误（`impl<T> Trait` 不识别），改为按 AST 提取 trait 名并排除固有 impl

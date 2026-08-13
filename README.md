@@ -140,7 +140,7 @@ enabled = false
 
 解析层：Rust、Python、TypeScript (含 TSX)、C#、Java。
 
-部分规则只实现了语言子集：R18/R19/R20 仅 Python/TS/TSX，R23 不含 Rust，R28 仅 Rust/TS/TSX，R06 仅 Rust。
+部分规则只实现了语言子集：R18/R19/R20 仅 Python/TS/TSX，R23 不含 Rust，R28 仅 Rust/TS/TSX，R06 仅 Rust，R07 不含 C#（using 是命名空间，单文件名字匹配原理上不可行）。
 
 ## 技术栈
 

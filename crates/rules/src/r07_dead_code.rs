@@ -22,12 +22,13 @@ impl Rule for DeadCode {
         Severity::Warning
     }
     fn languages(&self) -> &'static [Language] {
+        // C# 的 using 是命名空间，代码里引用的是命名空间内的类，
+        // 命名空间名本身不会作为标识符出现，单文件名字匹配原理上不可行
         &[
             Language::Rust,
             Language::Python,
             Language::TypeScript,
             Language::TypeScriptTsx,
-            Language::CSharp,
             Language::Java,
         ]
     }
@@ -264,6 +265,15 @@ fn collect_used_identifiers(ctx: &AnalysisContext) -> HashSet<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn languages_excludes_csharp() {
+        // C# using 是命名空间，单文件名字匹配原理上不可行（见 languages() 注释）
+        let langs = DeadCode.languages();
+        assert!(!langs.contains(&Language::CSharp));
+        assert!(langs.contains(&Language::Java));
+        assert!(langs.contains(&Language::Python));
+    }
 
     #[test]
     fn python_dotted_import_takes_top_module() {
