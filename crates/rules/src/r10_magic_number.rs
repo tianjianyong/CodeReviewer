@@ -141,10 +141,19 @@ fn is_magic(kind: &str, text: &str, min_string_len: usize) -> bool {
         if text.contains("{}") || text.contains("{0}") || text.contains("{1}") {
             return false;
         }
+        // 含 CJK 的字符串是人类可读文案（UI 提示等），不是魔法字面量
+        if text.chars().any(is_cjk) {
+            return false;
+        }
         return true;
     }
     let n: i64 = text.trim().parse().unwrap_or(0);
     !matches!(n, 0 | 1 | -1 | 2 | 10 | 100 | 1000)
+}
+
+/// CJK 统一表意文字（基本区 + 扩展 A）。
+fn is_cjk(c: char) -> bool {
+    ('\u{4E00}'..='\u{9FFF}').contains(&c) || ('\u{3400}'..='\u{4DBF}').contains(&c)
 }
 
 #[cfg(test)]
@@ -190,5 +199,23 @@ mod tests {
         assert!(is_test_file(Path::new("src/foo_test.rs")));
         assert!(is_test_file(Path::new("src/foo.test.ts")));
         assert!(is_test_file(Path::new("src/foo.spec.ts")));
+    }
+
+    #[test]
+    fn cjk_strings_are_not_magic() {
+        // 中文 UI 文案不是魔法字面量
+        assert!(!is_magic(
+            "string_literal",
+            "\"起点不能为空，请重新输入\"",
+            10
+        ));
+        // ASCII 编码/协议串仍然是魔法字面量
+        assert!(is_magic(
+            "string_literal",
+            "\"application/json;charset=utf-8\"",
+            10
+        ));
+        // 数字字面量不受影响
+        assert!(is_magic("integer_literal", "20", 10));
     }
 }
