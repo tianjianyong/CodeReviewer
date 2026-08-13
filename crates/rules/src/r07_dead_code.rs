@@ -120,26 +120,57 @@ fn extract_import_names(text: &str, lang: Language) -> Vec<String> {
                 return names
                     .split(',')
                     .map(|s| s.trim().split(" as ").last().unwrap_or("").trim().to_string())
+                    // 点号导入取顶层包名：os.path -> os（代码中只能通过 os 引用）
+                    .map(|s| s.split('.').next().unwrap_or("").to_string())
                     .filter(|s| !s.is_empty())
                     .collect();
             }
             Vec::new()
         }
         Language::TypeScript | Language::TypeScriptTsx => {
-            if let Some(pos) = text.find('{') {
-                let end = text[pos..].find('}').map(|e| pos + e).unwrap_or(text.len());
-                let names = &text[pos + 1..end];
-                return names
-                    .split(',')
-                    .map(|s| s.trim().split(" as ").last().unwrap_or("").trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect();
+            let text = text.trim();
+            // 绑定部分：import 与 from 之间的内容（含 import type 前缀）
+            let bindings = text
+                .strip_prefix("import ")
+                .unwrap_or(text)
+                .split(" from ")
+                .next()
+                .unwrap_or("")
+                .trim();
+            let mut names = Vec::new();
+            // 默认/命名空间导入: React | * as ns（去掉 import type 前缀）
+            let mut default_part = bindings.split('{').next().unwrap_or("").trim().trim_end_matches(',');
+            if default_part == "type" {
+                default_part = "";
+            } else if let Some(rest) = default_part.strip_prefix("type ") {
+                default_part = rest;
             }
-            if let Some(pos) = text.find("from") {
-                let _ = pos;
-                return Vec::new();
+            if let Some(ns) = default_part.strip_prefix("* as ") {
+                let ns = ns.trim();
+                if !ns.is_empty() {
+                    names.push(ns.to_string());
+                }
+            } else if !default_part.is_empty()
+                && default_part != "*"
+                && !default_part.starts_with('"')
+                && !default_part.starts_with('\'')
+            {
+                names.push(default_part.to_string());
             }
-            Vec::new()
+            // 具名导入: { a, b as c }
+            if let Some(pos) = bindings.find('{') {
+                let end = bindings[pos..]
+                    .find('}')
+                    .map(|e| pos + e)
+                    .unwrap_or(bindings.len());
+                for s in bindings[pos + 1..end].split(',') {
+                    let name = s.trim().split(" as ").last().unwrap_or("").trim();
+                    if !name.is_empty() {
+                        names.push(name.to_string());
+                    }
+                }
+            }
+            names
         }
         Language::CSharp => {
             let text = text.trim_start_matches("using ").trim_end_matches(';').trim();
@@ -151,7 +182,12 @@ fn extract_import_names(text: &str, lang: Language) -> Vec<String> {
         Language::Java => {
             let text = text.trim_start_matches("import ").trim_end_matches(';').trim();
             if let Some(pos) = text.rfind('.') {
-                return vec![text[pos + 1..].trim().to_string()];
+                let last = &text[pos + 1..];
+                // 通配符导入无法判断使用情况，跳过
+                if last == "*" {
+                    return Vec::new();
+                }
+                return vec![last.trim().to_string()];
             }
             vec![text.to_string()]
         }
@@ -176,9 +212,11 @@ fn collect_used_identifiers(ctx: &AnalysisContext) -> HashSet<String> {
     };
 
     let mut used = HashSet::new();
-    walk(ctx.tree.root_node(), &mut |node| {
+    // 手动遍历以跳过 import 语句子树：import 自身的标识符不应算作"使用"
+    let mut stack = vec![ctx.tree.root_node()];
+    while let Some(node) = stack.pop() {
         if import_kinds.contains(&node.kind()) {
-            return;
+            continue;
         }
         if identifier_kinds.contains(&node.kind()) {
             let text = node_text(&node, ctx.source);
@@ -186,7 +224,11 @@ fn collect_used_identifiers(ctx: &AnalysisContext) -> HashSet<String> {
                 used.insert(text.to_string());
             }
         }
-    });
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
     used
 }
 
@@ -202,5 +244,70 @@ fn walk<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
         for child in n.children(&mut cursor) {
             stack.push(child);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn python_dotted_import_takes_top_module() {
+        assert_eq!(
+            extract_import_names("import os.path", Language::Python),
+            vec!["os".to_string()]
+        );
+        assert_eq!(
+            extract_import_names("import os.path as p", Language::Python),
+            vec!["p".to_string()]
+        );
+        assert_eq!(
+            extract_import_names("import os, sys", Language::Python),
+            vec!["os".to_string(), "sys".to_string()]
+        );
+        assert_eq!(
+            extract_import_names("from x import a, b as c", Language::Python),
+            vec!["a".to_string(), "c".to_string()]
+        );
+    }
+
+    #[test]
+    fn ts_default_and_namespace_imports_extract_binding() {
+        assert_eq!(
+            extract_import_names("import React from \"react\"", Language::TypeScript),
+            vec!["React".to_string()]
+        );
+        assert_eq!(
+            extract_import_names("import * as ns from \"x\"", Language::TypeScript),
+            vec!["ns".to_string()]
+        );
+        assert_eq!(
+            extract_import_names("import { a, b as c } from \"x\"", Language::TypeScript),
+            vec!["a".to_string(), "c".to_string()]
+        );
+        assert_eq!(
+            extract_import_names("import \"side-effect\"", Language::TypeScript),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            extract_import_names("import type { x } from \"x\"", Language::TypeScript),
+            vec!["x".to_string()]
+        );
+        assert_eq!(
+            extract_import_names("import React, { useState } from \"react\"", Language::TypeScript),
+            vec!["React".to_string(), "useState".to_string()]
+        );
+    }
+
+    #[test]
+    fn java_wildcard_import_is_skipped() {
+        assert_eq!(
+            extract_import_names("import java.util.*;", Language::Java),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            extract_import_names("import java.util.List;", Language::Java),
+            vec!["List".to_string()]
+        );
     }
 }
