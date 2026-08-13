@@ -35,18 +35,24 @@ impl Rule for MissingDoc {
         let mut findings = Vec::new();
 
         walk(ctx.tree.root_node(), &mut |node| {
-            if public_kinds.contains(&node.kind()) && is_public(&node, ctx)
-                && !has_doc_comment(&node, ctx) {
-                    findings.push(Finding::new(
-                        "R03",
-                        "missing-doc",
-                        Severity::Warning,
-                        ctx.file_path,
-                        &node,
-                        ctx.source,
-                        format!("公开项缺少文档注释：{} | public item without doc comment: {}", node.kind(), node.kind()),
-                    ));
-                }
+            if public_kinds.contains(&node.kind())
+                && is_public(&node, ctx)
+                && !has_doc_comment(&node, ctx)
+            {
+                findings.push(Finding::new(
+                    "R03",
+                    "missing-doc",
+                    Severity::Warning,
+                    ctx.file_path,
+                    &node,
+                    ctx.source,
+                    format!(
+                        "公开项缺少文档注释：{} | public item without doc comment: {}",
+                        node.kind(),
+                        node.kind()
+                    ),
+                ));
+            }
         });
 
         Ok(findings)

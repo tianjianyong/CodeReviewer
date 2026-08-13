@@ -6,7 +6,7 @@ use rayon::prelude::*;
 
 use crate::config::Config;
 use crate::finding::{Finding, Severity};
-use crate::parser::{parse_file, ParseError};
+use crate::parser::{ParseError, parse_file};
 use crate::rule::{AnalysisContext, Rule, RuleError};
 
 /// 分析失败（如扫描路径不存在）。
@@ -139,12 +139,7 @@ impl Analyzer {
             .unwrap_or(true)
     }
 
-    fn rule_failure_finding(
-        &self,
-        rule: &dyn Rule,
-        file: &Path,
-        msg: &str,
-    ) -> Finding {
+    fn rule_failure_finding(&self, rule: &dyn Rule, file: &Path, msg: &str) -> Finding {
         Finding {
             rule_id: rule.id(),
             rule_name: rule.name(),
@@ -189,10 +184,12 @@ fn walk(dir: &Path, inherited: &[String], out: &mut Vec<PathBuf>) {
             if !is_excluded(&p, &pattern_refs) {
                 walk(&p, &patterns, out);
             }
-        } else if p.is_file() && crate::parser::Language::from_path(&p).is_some()
-            && !is_excluded(&p, &pattern_refs) {
-                out.push(p);
-            }
+        } else if p.is_file()
+            && crate::parser::Language::from_path(&p).is_some()
+            && !is_excluded(&p, &pattern_refs)
+        {
+            out.push(p);
+        }
     }
 }
 

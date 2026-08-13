@@ -22,7 +22,11 @@ impl Rule for OverlyDefensiveHandling {
     }
     fn languages(&self) -> &'static [Language] {
         // Python/C#/Java 的过度防御模式未实现
-        &[Language::Rust, Language::TypeScript, Language::TypeScriptTsx]
+        &[
+            Language::Rust,
+            Language::TypeScript,
+            Language::TypeScriptTsx,
+        ]
     }
 
     fn analyze(&self, ctx: &AnalysisContext) -> Result<Vec<Finding>, RuleError> {
@@ -80,7 +84,10 @@ fn find_ts_nullish_on_literal(ctx: &AnalysisContext, findings: &mut Vec<Finding>
         };
         let left = left.trim();
         // 字面量左侧不可空
-        if left.starts_with('"') || left.starts_with('\'') || left.chars().all(|c| c.is_ascii_digit()) {
+        if left.starts_with('"')
+            || left.starts_with('\'')
+            || left.chars().all(|c| c.is_ascii_digit())
+        {
             findings.push(Finding::new(
                 "R28",
                 "overly-defensive-handling",

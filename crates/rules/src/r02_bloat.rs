@@ -39,15 +39,11 @@ impl Rule for StructuralBloat {
     }
 
     fn analyze(&self, ctx: &AnalysisContext) -> Result<Vec<Finding>, RuleError> {
-        let max = ctx
-            .rule_config
-            .threshold_i64("max_function_lines", self.max_function_lines) as usize;
-        let max_nesting = ctx
-            .rule_config
-            .threshold_i64("max_nesting_depth", 4) as usize;
-        let max_params = ctx
-            .rule_config
-            .threshold_i64("max_parameters", 5) as usize;
+        let max =
+            ctx.rule_config
+                .threshold_i64("max_function_lines", self.max_function_lines) as usize;
+        let max_nesting = ctx.rule_config.threshold_i64("max_nesting_depth", 4) as usize;
+        let max_params = ctx.rule_config.threshold_i64("max_parameters", 5) as usize;
         let mut findings = Vec::new();
 
         let function_kinds = function_kinds(ctx.language);
@@ -72,20 +68,21 @@ impl Rule for StructuralBloat {
                 }
 
                 if let Some(params) = parameter_count(node, ctx.language)
-                    && params > max_params {
-                        findings.push(Finding::new(
-                            "R02",
-                            "structural-bloat",
-                            Severity::Warning,
-                            ctx.file_path,
-                            &node,
-                            ctx.source,
-                            format!(
-                                "参数过多：{} 个（上限 {}） | too many parameters: {} (max {})",
-                                params, max_params, params, max_params
-                            ),
-                        ));
-                    }
+                    && params > max_params
+                {
+                    findings.push(Finding::new(
+                        "R02",
+                        "structural-bloat",
+                        Severity::Warning,
+                        ctx.file_path,
+                        &node,
+                        ctx.source,
+                        format!(
+                            "参数过多：{} 个（上限 {}） | too many parameters: {} (max {})",
+                            params, max_params, params, max_params
+                        ),
+                    ));
+                }
 
                 let depth = max_nesting_depth(node);
                 if depth > max_nesting {

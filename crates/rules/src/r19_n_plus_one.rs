@@ -22,16 +22,18 @@ impl Rule for NPlusOneQuery {
         Severity::Warning
     }
     fn languages(&self) -> &'static [Language] {
-        &[Language::Python, Language::TypeScript, Language::TypeScriptTsx]
+        &[
+            Language::Python,
+            Language::TypeScript,
+            Language::TypeScriptTsx,
+        ]
     }
 
     fn analyze(&self, ctx: &AnalysisContext) -> Result<Vec<Finding>, RuleError> {
         let mut findings = Vec::new();
         match ctx.language {
             Language::Python => find_python_nplus1(ctx, &mut findings),
-            Language::TypeScript | Language::TypeScriptTsx => {
-                find_ts_nplus1(ctx, &mut findings)
-            }
+            Language::TypeScript | Language::TypeScriptTsx => find_ts_nplus1(ctx, &mut findings),
             _ => {}
         }
         Ok(findings)
@@ -104,14 +106,27 @@ fn find_ts_nplus1(ctx: &AnalysisContext, findings: &mut Vec<Finding>) {
 }
 
 fn is_queryset_source(source: &str) -> bool {
-    let signals = [".objects", ".filter(", ".all()", ".query", ".exclude(", ".order_by("];
+    let signals = [
+        ".objects",
+        ".filter(",
+        ".all()",
+        ".query",
+        ".exclude(",
+        ".order_by(",
+    ];
     signals.iter().any(|s| source.contains(s))
 }
 
 fn is_ts_query_source(text: &str) -> bool {
     let signals = [
-        ".findMany(", ".find(", "prisma.", ".query(", "from(\"", "Model.objects",
-        "db.collection", ".findAll(",
+        ".findMany(",
+        ".find(",
+        "prisma.",
+        ".query(",
+        "from(\"",
+        "Model.objects",
+        "db.collection",
+        ".findAll(",
     ];
     signals.iter().any(|s| text.contains(s))
 }
@@ -164,7 +179,10 @@ fn accesses_relation(func_node: &tree_sitter::Node, iter_var: &str, ctx: &Analys
             // 排除 x.save() / x.delete() / x.id / x.pk 等内置
             let rest = &text[prefix.len()..];
             let field = rest.split(['(', '.', ';', ' ']).next().unwrap_or("");
-            if !matches!(field, "id" | "pk" | "save" | "delete" | "objects" | "exists" | "count") {
+            if !matches!(
+                field,
+                "id" | "pk" | "save" | "delete" | "objects" | "exists" | "count"
+            ) {
                 found = true;
             }
         }

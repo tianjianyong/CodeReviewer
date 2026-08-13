@@ -124,10 +124,19 @@ fn returns_generic(node: &tree_sitter::Node, ctx: &AnalysisContext) -> bool {
     let text = node_text(node, ctx.source);
     // 体内 return 一个固定数字状态码 / None / null / false / 泛型 Error
     let generic_returns = [
-        "return 500", "return 400", "return 404", "return 422",
-        "return None", "return null", "return False", "return false",
-        "return 0", "return -1",
-        "return Err(Generic", "return Err(generic", "throw new Error(",
+        "return 500",
+        "return 400",
+        "return 404",
+        "return 422",
+        "return None",
+        "return null",
+        "return False",
+        "return false",
+        "return 0",
+        "return -1",
+        "return Err(Generic",
+        "return Err(generic",
+        "throw new Error(",
         "return ResponseEntity.status(500)",
         "return StatusCode::INTERNAL_SERVER_ERROR",
     ];
@@ -155,9 +164,17 @@ fn contains_word(text: &str, word: &str) -> bool {
     while let Some(pos) = rest.find(word) {
         let end = pos + word.len();
         let before_ok = pos == 0
-            || !rest[..pos].chars().last().map(is_word_char).unwrap_or(false);
+            || !rest[..pos]
+                .chars()
+                .last()
+                .map(is_word_char)
+                .unwrap_or(false);
         let after_ok = end >= rest.len()
-            || !rest[end..].chars().next().map(is_word_char).unwrap_or(false);
+            || !rest[end..]
+                .chars()
+                .next()
+                .map(is_word_char)
+                .unwrap_or(false);
         if before_ok && after_ok {
             return true;
         }
@@ -173,7 +190,8 @@ mod tests {
 
     #[test]
     fn broad_except_unused_var_flagged() {
-        let source = "def f():\n    try:\n        pass\n    except Exception as e:\n        return None\n";
+        let source =
+            "def f():\n    try:\n        pass\n    except Exception as e:\n        return None\n";
         let findings = analyze_source(&WrongErrorTypePropagation, source, Language::Python);
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule_id, "R23");

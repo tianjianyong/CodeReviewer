@@ -78,7 +78,9 @@ fn function_kinds(lang: Language) -> &'static [&'static str] {
     match lang {
         Language::Rust => &["function_item"],
         Language::Python => &["function_definition"],
-        Language::TypeScript | Language::TypeScriptTsx => &["function_declaration", "method_definition"],
+        Language::TypeScript | Language::TypeScriptTsx => {
+            &["function_declaration", "method_definition"]
+        }
         Language::CSharp => &["method_declaration"],
         Language::Java => &["method_declaration"],
     }
@@ -92,12 +94,28 @@ fn is_boundary_function(node: &tree_sitter::Node, ctx: &AnalysisContext) -> bool
     }
     // HTTP handler 信号
     let handler_signals = [
-        "@app.route", "@app.get", "@app.post", "@app.put", "@app.delete",
-        "@router.", "@Get", "@Post", "@Put", "@Delete", "@RequestMapping",
-        "[HttpGet", "[HttpPost", "[Route",
-        "@GetMapping", "@PostMapping",
-        "req.", "request.", "req:", "request:",
-        "handler", "Handler",
+        "@app.route",
+        "@app.get",
+        "@app.post",
+        "@app.put",
+        "@app.delete",
+        "@router.",
+        "@Get",
+        "@Post",
+        "@Put",
+        "@Delete",
+        "@RequestMapping",
+        "[HttpGet",
+        "[HttpPost",
+        "[Route",
+        "@GetMapping",
+        "@PostMapping",
+        "req.",
+        "request.",
+        "req:",
+        "request:",
+        "handler",
+        "Handler",
     ];
     if handler_signals.iter().any(|s| text.contains(s)) {
         return true;
@@ -151,12 +169,32 @@ fn is_parameter_node(node: &tree_sitter::Node, lang: Language) -> bool {
 
 fn has_validation_guard(body: &str, _lang: Language) -> bool {
     let guards = [
-        "is_empty()", "!is_empty", ".is_empty", "len() == 0", "len() >",
-        "len() <", "is_none()", "is_some()", "is_ok()", "is_err()",
-        "is_empty", "len(x) ==", "len(x) >", "if not ", "if len(",
-        ".length ==", ".length >", ".length <", ".length === 0",
-        "isNullOr", "isUndefined", "isNil", "if (!", "if (x ==",
-        "isNullOrEmpty", "isNullOrWhiteSpace",
+        "is_empty()",
+        "!is_empty",
+        ".is_empty",
+        "len() == 0",
+        "len() >",
+        "len() <",
+        "is_none()",
+        "is_some()",
+        "is_ok()",
+        "is_err()",
+        "is_empty",
+        "len(x) ==",
+        "len(x) >",
+        "if not ",
+        "if len(",
+        ".length ==",
+        ".length >",
+        ".length <",
+        ".length === 0",
+        "isNullOr",
+        "isUndefined",
+        "isNil",
+        "if (!",
+        "if (x ==",
+        "isNullOrEmpty",
+        "isNullOrWhiteSpace",
     ];
     guards.iter().any(|g| body.contains(g))
 }

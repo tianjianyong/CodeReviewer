@@ -23,7 +23,11 @@ fn test_sample_rust_finds_bloat() {
     let path = fixtures_dir().join("sample_rust.rs");
     let result = analyzer.analyze_path(&path).expect("analyze failed");
 
-    let r02: Vec<_> = result.findings.iter().filter(|f| f.rule_id == "R02").collect();
+    let r02: Vec<_> = result
+        .findings
+        .iter()
+        .filter(|f| f.rule_id == "R02")
+        .collect();
     assert!(!r02.is_empty(), "should find R02 bloat in sample_rust.rs");
     assert!(r02.iter().all(|f| f.severity == Severity::Warning));
 }
@@ -38,7 +42,10 @@ fn test_problematic_finds_multiple_rule_types() {
     let rule_ids: Vec<&str> = result.findings.iter().map(|f| f.rule_id).collect();
     assert!(rule_ids.contains(&"R01"), "should find R01 fallback");
     assert!(rule_ids.contains(&"R03"), "should find R03 missing doc");
-    assert!(rule_ids.contains(&"R06"), "should find R06 over-engineering");
+    assert!(
+        rule_ids.contains(&"R06"),
+        "should find R06 over-engineering"
+    );
     assert!(rule_ids.contains(&"R08"), "should find R08 TODO");
     assert!(rule_ids.contains(&"R09"), "should find R09 commented code");
     // R10 is skipped because fixture is under tests/ directory
@@ -52,7 +59,11 @@ fn test_r10_skips_test_files() {
     // problematic.rs is under tests/fixtures/ -> R10 should be skipped
     let path = fixtures_dir().join("problematic.rs");
     let result = analyzer.analyze_path(&path).expect("analyze failed");
-    let r10_count = result.findings.iter().filter(|f| f.rule_id == "R10").count();
+    let r10_count = result
+        .findings
+        .iter()
+        .filter(|f| f.rule_id == "R10")
+        .count();
     assert_eq!(r10_count, 0, "R10 should skip files under tests/ directory");
 }
 

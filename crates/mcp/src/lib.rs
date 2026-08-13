@@ -5,11 +5,11 @@ use std::path::PathBuf;
 use codereviewer_core::analyzer::Analyzer;
 use codereviewer_core::config::Config;
 use codereviewer_core::reporter::Report;
+use rmcp::ServiceExt;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::schemars;
 use rmcp::tool;
 use rmcp::tool_router;
-use rmcp::ServiceExt;
 use rmcp::transport::stdio;
 use serde::Deserialize;
 
@@ -30,8 +30,9 @@ impl CodeReviewerServer {
         Parameters(ReviewParams { path }): Parameters<ReviewParams>,
     ) -> Result<String, rmcp::ErrorData> {
         let rules = codereviewer_rules::all_rules();
-        let config = Config::load_auto()
-            .map_err(|e| rmcp::ErrorData::internal_error(format!("failed to load config: {e}"), None))?;
+        let config = Config::load_auto().map_err(|e| {
+            rmcp::ErrorData::internal_error(format!("failed to load config: {e}"), None)
+        })?;
         let analyzer = Analyzer::new(rules, config);
         let result = analyzer
             .analyze_path(&PathBuf::from(&path))

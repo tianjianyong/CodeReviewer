@@ -53,13 +53,15 @@ fn detect_single_impl_traits<'a>(ctx: &'a AnalysisContext<'a>) -> Vec<Finding> {
     let mut stack = vec![ctx.tree.root_node()];
     while let Some(node) = stack.pop() {
         if node.kind() == "trait_item"
-            && let Some(name) = extract_trait_name(&node, ctx) {
-                traits.push(TraitInfo { name, node });
-            }
+            && let Some(name) = extract_trait_name(&node, ctx)
+        {
+            traits.push(TraitInfo { name, node });
+        }
         if node.kind() == "impl_item"
-            && let Some(name) = extract_impl_trait_name(&node, ctx) {
-                impl_names.push(name);
-            }
+            && let Some(name) = extract_impl_trait_name(&node, ctx)
+        {
+            impl_names.push(name);
+        }
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
             stack.push(child);

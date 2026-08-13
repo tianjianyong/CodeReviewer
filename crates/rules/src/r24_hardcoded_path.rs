@@ -59,7 +59,10 @@ impl Rule for HardcodedPathOrUrl {
                     ctx.source,
                     format!(
                         "硬编码{}：{} | hardcoded {}: {}",
-                        kind_zh(kind), inner, kind_en(kind), inner
+                        kind_zh(kind),
+                        inner,
+                        kind_en(kind),
+                        inner
                     ),
                 ));
             }
@@ -97,10 +100,9 @@ fn classify(s: &str) -> Option<Kind> {
     if s == "https://" || s == "http://" || s == "/**" || s == "/*" {
         return None;
     }
-    if (s.starts_with("https://") || s.starts_with("http://"))
-        && !is_localhost_url(s) {
-            return Some(Kind::Url);
-        }
+    if (s.starts_with("https://") || s.starts_with("http://")) && !is_localhost_url(s) {
+        return Some(Kind::Url);
+    }
     if is_absolute_path(s) {
         return Some(Kind::Path);
     }
@@ -131,9 +133,14 @@ fn is_absolute_path(s: &str) -> bool {
 
 fn strip_quotes(s: &str) -> &str {
     let s = s.trim();
-    let s = s.strip_prefix('"').and_then(|x| x.strip_suffix('"')).unwrap_or(s);
-    
-    (s.strip_prefix('\'').and_then(|x| x.strip_suffix('\'')).unwrap_or(s)) as _
+    let s = s
+        .strip_prefix('"')
+        .and_then(|x| x.strip_suffix('"'))
+        .unwrap_or(s);
+
+    (s.strip_prefix('\'')
+        .and_then(|x| x.strip_suffix('\''))
+        .unwrap_or(s)) as _
 }
 
 fn env_signals(lang: Language) -> Vec<&'static str> {
@@ -159,9 +166,12 @@ fn literal_kinds(lang: Language) -> &'static [&'static str] {
 }
 
 fn is_test_file(path: &std::path::Path) -> bool {
-    let has_test_dir = path
-        .components()
-        .any(|c| matches!(c.as_os_str().to_string_lossy().to_lowercase().as_str(), "tests" | "test" | "__tests__"));
+    let has_test_dir = path.components().any(|c| {
+        matches!(
+            c.as_os_str().to_string_lossy().to_lowercase().as_str(),
+            "tests" | "test" | "__tests__"
+        )
+    });
     if has_test_dir {
         return true;
     }

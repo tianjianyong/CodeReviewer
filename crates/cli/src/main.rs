@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::{Parser as ClapParser, Subcommand};
 
 use codereviewer_core::analyzer::Analyzer;
@@ -41,7 +41,13 @@ enum Command {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Command::Check { path, format, config, rules, severity } => {
+        Command::Check {
+            path,
+            format,
+            config,
+            rules,
+            severity,
+        } => {
             if !matches!(format.as_str(), "text" | "json") {
                 bail!(
                     "无效输出格式：{format}（可选 text/json） | invalid format: {format} (text/json)"
@@ -104,7 +110,12 @@ fn main() -> Result<()> {
         }
         Command::ListRules => {
             for rule in codereviewer_rules::all_rules() {
-                println!("{} {} [{}]", rule.id(), rule.name(), rule.severity().display_label());
+                println!(
+                    "{} {} [{}]",
+                    rule.id(),
+                    rule.name(),
+                    rule.severity().display_label()
+                );
             }
         }
     }

@@ -51,7 +51,10 @@ impl Rule for DeadCode {
                         line: imp.line,
                         column: 1,
                     },
-                    message: format!("未使用的 import：{} | unused import: {}", imp.name, imp.name),
+                    message: format!(
+                        "未使用的 import：{} | unused import: {}",
+                        imp.name, imp.name
+                    ),
                     snippet: None,
                 });
             }
@@ -107,18 +110,34 @@ fn extract_import_names(text: &str, lang: Language) -> Vec<String> {
         Language::Python => {
             let text = text.trim();
             if text.starts_with("from ")
-                && let Some(pos) = text.find(" import ") {
-                    let names = &text[pos + 8..];
-                    return names
-                        .split(',')
-                        .map(|s| s.trim().trim_start_matches("as ").split(" as ").last().unwrap_or("").trim().to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect();
-                }
+                && let Some(pos) = text.find(" import ")
+            {
+                let names = &text[pos + 8..];
+                return names
+                    .split(',')
+                    .map(|s| {
+                        s.trim()
+                            .trim_start_matches("as ")
+                            .split(" as ")
+                            .last()
+                            .unwrap_or("")
+                            .trim()
+                            .to_string()
+                    })
+                    .filter(|s| !s.is_empty())
+                    .collect();
+            }
             if let Some(names) = text.strip_prefix("import ") {
                 return names
                     .split(',')
-                    .map(|s| s.trim().split(" as ").last().unwrap_or("").trim().to_string())
+                    .map(|s| {
+                        s.trim()
+                            .split(" as ")
+                            .last()
+                            .unwrap_or("")
+                            .trim()
+                            .to_string()
+                    })
                     // 点号导入取顶层包名：os.path -> os（代码中只能通过 os 引用）
                     .map(|s| s.split('.').next().unwrap_or("").to_string())
                     .filter(|s| !s.is_empty())
@@ -138,7 +157,12 @@ fn extract_import_names(text: &str, lang: Language) -> Vec<String> {
                 .trim();
             let mut names = Vec::new();
             // 默认/命名空间导入: React | * as ns（去掉 import type 前缀）
-            let mut default_part = bindings.split('{').next().unwrap_or("").trim().trim_end_matches(',');
+            let mut default_part = bindings
+                .split('{')
+                .next()
+                .unwrap_or("")
+                .trim()
+                .trim_end_matches(',');
             if default_part == "type" {
                 default_part = "";
             } else if let Some(rest) = default_part.strip_prefix("type ") {
@@ -172,14 +196,20 @@ fn extract_import_names(text: &str, lang: Language) -> Vec<String> {
             names
         }
         Language::CSharp => {
-            let text = text.trim_start_matches("using ").trim_end_matches(';').trim();
+            let text = text
+                .trim_start_matches("using ")
+                .trim_end_matches(';')
+                .trim();
             if let Some(pos) = text.rfind('.') {
                 return vec![text[pos + 1..].trim().to_string()];
             }
             vec![text.to_string()]
         }
         Language::Java => {
-            let text = text.trim_start_matches("import ").trim_end_matches(';').trim();
+            let text = text
+                .trim_start_matches("import ")
+                .trim_end_matches(';')
+                .trim();
             if let Some(pos) = text.rfind('.') {
                 let last = &text[pos + 1..];
                 // 通配符导入无法判断使用情况，跳过
@@ -231,7 +261,6 @@ fn collect_used_identifiers(ctx: &AnalysisContext) -> HashSet<String> {
     used
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -279,7 +308,10 @@ mod tests {
             vec!["x".to_string()]
         );
         assert_eq!(
-            extract_import_names("import React, { useState } from \"react\"", Language::TypeScript),
+            extract_import_names(
+                "import React, { useState } from \"react\"",
+                Language::TypeScript
+            ),
             vec!["React".to_string(), "useState".to_string()]
         );
     }

@@ -74,9 +74,7 @@ pub fn parse(source: &str, language: Language) -> Result<Tree, ParseError> {
     parser
         .set_language(&language.tree_sitter_language())
         .map_err(|e| ParseError::SetLanguage(e.to_string()))?;
-    parser
-        .parse(source, None)
-        .ok_or(ParseError::NoTree)
+    parser.parse(source, None).ok_or(ParseError::NoTree)
 }
 
 pub fn parse_file(path: &Path) -> Result<(Tree, Language, String), ParseError> {

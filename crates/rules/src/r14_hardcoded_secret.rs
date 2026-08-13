@@ -70,7 +70,10 @@ impl Rule for HardcodedSecret {
                 ctx.source,
                 format!(
                     "疑似硬编码密钥（{}）：{} | suspected hardcoded secret ({}): {}",
-                    reason_zh(reason), inner, reason_en(reason), inner
+                    reason_zh(reason),
+                    inner,
+                    reason_en(reason),
+                    inner
                 ),
             ));
         });
@@ -107,7 +110,15 @@ fn classify(s: &str, min_len: usize) -> Option<Reason> {
         return Some(Reason::PrivateKey);
     }
     let prefixes = [
-        "sk-", "sk_", "ghp_", "gho_", "github_pat_", "AKIA", "xoxb-", "xoxp-", "AIza",
+        "sk-",
+        "sk_",
+        "ghp_",
+        "gho_",
+        "github_pat_",
+        "AKIA",
+        "xoxb-",
+        "xoxp-",
+        "AIza",
         "eyJ", // JWT 头
     ];
     if prefixes.iter().any(|p| s.starts_with(p)) {
@@ -148,8 +159,19 @@ fn is_high_entropy(s: &str) -> bool {
 fn is_secret_named(name: &str) -> bool {
     let lower = name.to_lowercase();
     [
-        "api_key", "apikey", "secret", "token", "password", "passwd", "pwd",
-        "private_key", "priv_key", "privkey", "access_key", "auth", "credential",
+        "api_key",
+        "apikey",
+        "secret",
+        "token",
+        "password",
+        "passwd",
+        "pwd",
+        "private_key",
+        "priv_key",
+        "privkey",
+        "access_key",
+        "auth",
+        "credential",
     ]
     .iter()
     .any(|k| lower.contains(k))
@@ -169,9 +191,14 @@ fn enclosing_var_name(node: &tree_sitter::Node, ctx: &AnalysisContext) -> String
         }
         // let / const / var 声明
         for decl_kind in [
-            "let_declaration", "let_statement", "variable_declaration",
-            "local_variable_declaration", "field_declaration", "constant_declaration",
-            "const_item", "static_item",
+            "let_declaration",
+            "let_statement",
+            "variable_declaration",
+            "local_variable_declaration",
+            "field_declaration",
+            "constant_declaration",
+            "const_item",
+            "static_item",
         ] {
             if parent.kind() == decl_kind {
                 let mut cursor = parent.walk();
@@ -192,9 +219,14 @@ fn enclosing_var_name(node: &tree_sitter::Node, ctx: &AnalysisContext) -> String
 
 fn strip_quotes(s: &str) -> &str {
     let s = s.trim();
-    let s = s.strip_prefix('"').and_then(|x| x.strip_suffix('"')).unwrap_or(s);
-    
-    (s.strip_prefix('\'').and_then(|x| x.strip_suffix('\'')).unwrap_or(s)) as _
+    let s = s
+        .strip_prefix('"')
+        .and_then(|x| x.strip_suffix('"'))
+        .unwrap_or(s);
+
+    (s.strip_prefix('\'')
+        .and_then(|x| x.strip_suffix('\''))
+        .unwrap_or(s)) as _
 }
 
 fn literal_kinds(lang: Language) -> &'static [&'static str] {
@@ -208,9 +240,12 @@ fn literal_kinds(lang: Language) -> &'static [&'static str] {
 }
 
 fn is_test_file(path: &std::path::Path) -> bool {
-    let has_test_dir = path
-        .components()
-        .any(|c| matches!(c.as_os_str().to_string_lossy().to_lowercase().as_str(), "tests" | "test" | "__tests__"));
+    let has_test_dir = path.components().any(|c| {
+        matches!(
+            c.as_os_str().to_string_lossy().to_lowercase().as_str(),
+            "tests" | "test" | "__tests__"
+        )
+    });
     if has_test_dir {
         return true;
     }

@@ -85,22 +85,45 @@ fn is_integration_test(node: &tree_sitter::Node, ctx: &AnalysisContext) -> bool 
         || text.contains("TestClient")
         || text.contains("http")
         || text.contains("api");
-    let name_suggests = name.contains("integration") || name.contains("e2e") || name.contains("end_to_end");
+    let name_suggests =
+        name.contains("integration") || name.contains("e2e") || name.contains("end_to_end");
     has_http && (name_suggests || name.starts_with("test_"))
 }
 
 fn count_meaningful_checks(node: &tree_sitter::Node, ctx: &AnalysisContext) -> usize {
     let text = node_text(node, ctx.source);
     let shallow_signals = [
-        "status()", "is_success", "is_ok", "is_success()", "status_code",
-        "assert_ok", "Ok(", "unwrap()", "expect(",
+        "status()",
+        "is_success",
+        "is_ok",
+        "is_success()",
+        "status_code",
+        "assert_ok",
+        "Ok(",
+        "unwrap()",
+        "expect(",
     ];
     let deep_signals = [
-        "json(", "body", "header", "content", "contains", "eq(",
-        "assert_eq!", "assert_ne!", "expect(", "body(", "text()",
-        "json_body", "response.body", "data[", "result[",
+        "json(",
+        "body",
+        "header",
+        "content",
+        "contains",
+        "eq(",
+        "assert_eq!",
+        "assert_ne!",
+        "expect(",
+        "body(",
+        "text()",
+        "json_body",
+        "response.body",
+        "data[",
+        "result[",
     ];
-    let shallow: usize = shallow_signals.iter().map(|s| text.matches(s).count()).sum();
+    let shallow: usize = shallow_signals
+        .iter()
+        .map(|s| text.matches(s).count())
+        .sum();
     let deep: usize = deep_signals.iter().map(|s| text.matches(s).count()).sum();
     if shallow > 0 && deep == 0 {
         1

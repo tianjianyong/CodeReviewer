@@ -87,11 +87,34 @@ fn has_vague_name(name: &str) -> bool {
     }
     // 行为后缀信号词（含动词与条件状语）
     let behavior_signals = [
-        "_when", "_if", "_given", "_should", "_with", "_for", "_on_",
-        "_returns", "_throws", "_fails", "_succeeds", "_is", "_has",
-        "_finds", "_skips", "_returns", "_has", "_does", "_not_",
-        "_flagged", "_count", "_all", "_multiple", "_errors",
-        "when", "should", "given", "if_",
+        "_when",
+        "_if",
+        "_given",
+        "_should",
+        "_with",
+        "_for",
+        "_on_",
+        "_returns",
+        "_throws",
+        "_fails",
+        "_succeeds",
+        "_is",
+        "_has",
+        "_finds",
+        "_skips",
+        "_returns",
+        "_has",
+        "_does",
+        "_not_",
+        "_flagged",
+        "_count",
+        "_all",
+        "_multiple",
+        "_errors",
+        "when",
+        "should",
+        "given",
+        "if_",
     ];
     !behavior_signals.iter().any(|s| lower.contains(s))
 }
@@ -112,7 +135,10 @@ fn first_private_member_access(node: &tree_sitter::Node, ctx: &AnalysisContext) 
             .or_else(|| text.strip_prefix("this._"))
             .or_else(|| text.strip_prefix("this.__"))
         {
-            let member = rest.split([' ', '.', ';', ',', '(', ')']).next().unwrap_or("");
+            let member = rest
+                .split([' ', '.', ';', ',', '(', ')'])
+                .next()
+                .unwrap_or("");
             if !member.is_empty() && member.chars().all(|c| c.is_alphanumeric() || c == '_') {
                 found = Some(member.to_string());
             }
@@ -125,7 +151,9 @@ fn function_kinds(lang: Language) -> &'static [&'static str] {
     match lang {
         Language::Rust => &["function_item"],
         Language::Python => &["function_definition"],
-        Language::TypeScript | Language::TypeScriptTsx => &["function_declaration", "method_definition"],
+        Language::TypeScript | Language::TypeScriptTsx => {
+            &["function_declaration", "method_definition"]
+        }
         Language::CSharp => &["method_declaration"],
         Language::Java => &["method_declaration"],
     }

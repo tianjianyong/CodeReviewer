@@ -23,7 +23,11 @@ impl Rule for ResourceLeak {
     }
     fn languages(&self) -> &'static [Language] {
         // Rust 因 RAII 不适用；C#/Java 资源管理模式（using/try-with-resources）未实现
-        &[Language::Python, Language::TypeScript, Language::TypeScriptTsx]
+        &[
+            Language::Python,
+            Language::TypeScript,
+            Language::TypeScriptTsx,
+        ]
     }
 
     fn analyze(&self, ctx: &AnalysisContext) -> Result<Vec<Finding>, RuleError> {
@@ -52,8 +56,7 @@ fn find_python_leaks(ctx: &AnalysisContext, findings: &mut Vec<Finding>) {
             return;
         }
         // 是否在 with 语句内（with_statement 包裹）
-        let in_with = has_ancestor_kind(&node, "with_statement")
-            || count_in_with(&node) > 0;
+        let in_with = has_ancestor_kind(&node, "with_statement") || count_in_with(&node) > 0;
         let has_close = body.contains(".close()");
         if !in_with && !has_close {
             findings.push(Finding::new(

@@ -72,7 +72,7 @@ pub(crate) mod test_util {
 
     use codereviewer_core::config::RuleConfig;
     use codereviewer_core::finding::Finding;
-    use codereviewer_core::parser::{parse, Language};
+    use codereviewer_core::parser::{Language, parse};
     use codereviewer_core::rule::{AnalysisContext, Rule};
 
     /// 解析源码并跑单条规则，返回 findings（规则单元测试用）。
