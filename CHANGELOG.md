@@ -26,7 +26,7 @@
 
 - 抽取共享 `core::ast` 工具（`walk`/`node_text`/`line_of`）与 `Finding::new`（自动带 snippet），规则层净减 334 行
 - 文件只读一次；`.gitignore` 模式继承到子目录；排除模式每次扫描只计算一次
-- MCP server 与 CLI 共用 `.codereviewer.toml` 配置加载（此前 MCP 恒用默认配置）
+- MCP server 与 CLI 共用 `.codereviewer.toml` 配置加载（此前 MCP 恒用默认配置）；配置发现锚定扫描路径（向上一层查找，回退当前目录）
 - JSON 输出新增 `snippet`、`skipped`、`parse_errors` 字段
 - 规则声明语言与实现对齐：R18/R19/R20 仅 Python/TS/TSX，R23 不含 Rust，R28 仅 Rust/TS/TSX
 - 文件级并行分析（rayon），输出顺序保持确定性

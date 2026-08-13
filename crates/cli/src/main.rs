@@ -55,7 +55,7 @@ fn main() -> Result<()> {
             }
             let cfg = match config.as_deref() {
                 Some(p) => Config::load_from_file(p).context("failed to load config")?,
-                None => Config::load_auto().context("failed to load project config")?,
+                None => Config::load_auto_from(&path).context("failed to load project config")?,
             };
             let mut all_rules = codereviewer_rules::all_rules();
             if let Some(filter) = &rules {

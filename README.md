@@ -121,6 +121,8 @@ CodeReviewer 自动读取扫描目录下的 `.gitignore` 文件并排除其中�
 
 在项目根创建 `.codereviewer.toml` 追加项目特定目录：
 
+> 配置发现顺序：从**扫描路径**所在目录向上查找，找不到再从当前工作目录向上查找，都没有则用默认。
+
 ```toml
 [global]
 exclude = ["target/", "vendor/"]

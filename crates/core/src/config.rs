@@ -52,27 +52,38 @@ impl Config {
         toml::from_str(&text).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
     }
 
+    /// 从扫描路径向上查找 .codereviewer.toml；找不到则回退从当前目录向上找；都没有用默认。
+    pub fn load_auto_from(start: &Path) -> Result<Self, std::io::Error> {
+        if let Some(p) = find_up_from(start) {
+            return Self::load_from_file(&p);
+        }
+        Self::load_auto()
+    }
+
     /// 从当前目录向上查找 .codereviewer.toml 并加载；找不到返回默认配置。
     pub fn load_auto() -> Result<Self, std::io::Error> {
-        match Self::find_project_config() {
+        match std::env::current_dir().ok().and_then(|d| find_up_from(&d)) {
             Some(p) => Self::load_from_file(&p),
             None => Ok(Self::default()),
         }
     }
+}
 
-    /// 从当前目录向上查找 .codereviewer.toml。
-    pub fn find_project_config() -> Option<std::path::PathBuf> {
-        let dir = std::env::current_dir().ok()?;
-        let mut current = dir.as_path();
-        loop {
-            let candidate = current.join(".codereviewer.toml");
-            if candidate.is_file() {
-                return Some(candidate);
-            }
-            match current.parent() {
-                Some(parent) => current = parent,
-                None => return None,
-            }
+/// 从 start 目录向上查找 .codereviewer.toml。
+fn find_up_from(start: &Path) -> Option<std::path::PathBuf> {
+    let mut current = if start.is_dir() {
+        start
+    } else {
+        start.parent()?
+    };
+    loop {
+        let candidate = current.join(".codereviewer.toml");
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+        match current.parent() {
+            Some(parent) => current = parent,
+            None => return None,
         }
     }
 }
