@@ -29,7 +29,7 @@
 - 规则声明语言与实现对齐：R18/R19/R20 仅 Python/TS/TSX，R23 不含 Rust，R28 仅 Rust/TS/TSX
 - 文件级并行分析（rayon），输出顺序保持确定性
 - r02 嵌套深度改为迭代实现（消除深 AST 递归栈溢出风险）
-- clippy 告警清零；新增 CI workflow（clippy + test + release build）
+- clippy 告警清零；新增 CI workflow（fmt + clippy + test + release build）
 - 新增 MIT LICENSE；MCP 配置命令改为跨平台的 `cargo run` 形式
 
 ### 移除（Removed）
