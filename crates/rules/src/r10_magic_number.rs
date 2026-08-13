@@ -160,7 +160,7 @@ fn is_cjk(c: char) -> bool {
 mod tests {
     use std::path::Path;
 
-    use super::is_test_file;
+    use super::{is_magic, is_test_file};
 
     #[test]
     fn test_relative_path_with_tests_dir() {

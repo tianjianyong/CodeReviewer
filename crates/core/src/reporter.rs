@@ -281,7 +281,7 @@ fn top_files(findings: &[&Finding], limit: usize) -> Vec<(String, usize)> {
             None => files.push((name, 1)),
         }
     }
-    files.sort_by(|a, b| b.1.cmp(&a.1));
+    files.sort_by_key(|(_, c)| std::cmp::Reverse(*c));
     files.truncate(limit);
     files
 }
