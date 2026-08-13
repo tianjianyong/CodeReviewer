@@ -4,7 +4,8 @@
 //! 体内访问 x.<关系字段>，而 queryset 源未调用 select_related/prefetch_related/include/with。
 //! 无 schema 信息，靠信号词启发式，可能误报普通循环。
 
-use codereviewer_core::finding::{Finding, Location, Severity};
+use codereviewer_core::ast::{node_text, walk};
+use codereviewer_core::finding::{Finding, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
 
@@ -21,13 +22,7 @@ impl Rule for NPlusOneQuery {
         Severity::Warning
     }
     fn languages(&self) -> &'static [Language] {
-        &[
-            Language::Python,
-            Language::TypeScript,
-            Language::TypeScriptTsx,
-            Language::CSharp,
-            Language::Java,
-        ]
+        &[Language::Python, Language::TypeScript, Language::TypeScriptTsx]
     }
 
     fn analyze(&self, ctx: &AnalysisContext) -> Result<Vec<Finding>, RuleError> {
@@ -63,21 +58,15 @@ fn find_python_nplus1(ctx: &AnalysisContext, findings: &mut Vec<Finding>) {
             return;
         }
         if accesses_relation(&node, &iter_var, ctx) {
-            let pos = node.start_position();
-            findings.push(Finding {
-                rule_id: "R19",
-                rule_name: "n-plus-one-query",
-                severity: Severity::Warning,
-                location: Location {
-                    file: ctx.file_path.to_path_buf(),
-                    line: pos.row + 1,
-                    column: pos.column + 1,
-                },
-                message: format!(
-                    "循环遍历 queryset 访问关系字段可能触发 N+1 查询，建议用 select_related/prefetch_related | iterating queryset and accessing relation may cause N+1 query, use select_related/prefetch_related"
-                ),
-                snippet: None,
-            });
+            findings.push(Finding::new(
+                "R19",
+                "n-plus-one-query",
+                Severity::Warning,
+                ctx.file_path,
+                &node,
+                ctx.source,
+                "循环遍历 queryset 访问关系字段可能触发 N+1 查询，建议用 select_related/prefetch_related | iterating queryset and accessing relation may cause N+1 query, use select_related/prefetch_related".to_string(),
+            ));
         }
     });
 }
@@ -101,21 +90,15 @@ fn find_ts_nplus1(ctx: &AnalysisContext, findings: &mut Vec<Finding>) {
         }
         // 箭头函数体内访问 x.<field>
         if text.contains("=> x.") || text.contains("=> item.") || text.contains("=> row.") {
-            let pos = node.start_position();
-            findings.push(Finding {
-                rule_id: "R19",
-                rule_name: "n-plus-one-query",
-                severity: Severity::Warning,
-                location: Location {
-                    file: ctx.file_path.to_path_buf(),
-                    line: pos.row + 1,
-                    column: pos.column + 1,
-                },
-                message: format!(
-                    ".map/.forEach 遍历查询结果访问关系字段可能触发 N+1 查询，建议用 include/with | .map/.forEach over query result accessing relation may cause N+1 query, use include/with"
-                ),
-                snippet: None,
-            });
+            findings.push(Finding::new(
+                "R19",
+                "n-plus-one-query",
+                Severity::Warning,
+                ctx.file_path,
+                &node,
+                ctx.source,
+                ".map/.forEach 遍历查询结果访问关系字段可能触发 N+1 查询，建议用 include/with | .map/.forEach over query result accessing relation may cause N+1 query, use include/with".to_string(),
+            ));
         }
     });
 }
@@ -144,10 +127,15 @@ fn has_ts_prefetch(text: &str) -> bool {
 }
 
 fn extract_for_source(node: &tree_sitter::Node, ctx: &AnalysisContext) -> String {
+    // for_statement 子节点顺序：for / 循环变量 / in / 可迭代对象。
+    // 从 "in" 之后取可迭代对象；此前实现取第一个 identifier，拿到的是循环变量，规则从未生效。
     let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        if child.kind() == "call" || child.kind() == "identifier" || child.kind() == "attribute" {
-            return node_text(&child, ctx.source).to_string();
+    let children: Vec<tree_sitter::Node> = node.children(&mut cursor).collect();
+    if let Some(pos) = children.iter().position(|c| c.kind() == "in") {
+        for c in &children[pos + 1..] {
+            if matches!(c.kind(), "call" | "identifier" | "attribute" | "subscript") {
+                return node_text(c, ctx.source).to_string();
+            }
         }
     }
     String::new()
@@ -182,19 +170,4 @@ fn accesses_relation(func_node: &tree_sitter::Node, iter_var: &str, ctx: &Analys
         }
     });
     found
-}
-
-fn node_text<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
-    source.get(node.start_byte()..node.end_byte()).unwrap_or("")
-}
-
-fn walk<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
-    let mut stack = vec![node];
-    while let Some(n) = stack.pop() {
-        visit(n);
-        let mut cursor = n.walk();
-        for child in n.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
 }

@@ -1,8 +1,7 @@
 //! R02: 结构臃肿 - 函数行数/嵌套深度/参数个数检测。
-//!
-//! MVP 先实现函数行数检测（最简单，作为样板规则）。
 
-use codereviewer_core::finding::{Finding, Location, Severity};
+use codereviewer_core::ast::walk;
+use codereviewer_core::finding::{Finding, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
 
@@ -52,66 +51,57 @@ impl Rule for StructuralBloat {
         let mut findings = Vec::new();
 
         let function_kinds = function_kinds(ctx.language);
-        walk_nodes(ctx.tree.root_node(), &mut |node| {
+        walk(ctx.tree.root_node(), &mut |node| {
             if function_kinds.contains(&node.kind()) {
                 let start = node.start_position();
                 let end = node.end_position();
                 let lines = end.row.saturating_sub(start.row) + 1;
                 if lines > max {
-                    findings.push(Finding {
-                        rule_id: "R02",
-                        rule_name: "structural-bloat",
-                        severity: Severity::Warning,
-                        location: Location {
-                            file: ctx.file_path.to_path_buf(),
-                            line: start.row + 1,
-                            column: start.column + 1,
-                        },
-                        message: format!(
+                    findings.push(Finding::new(
+                        "R02",
+                        "structural-bloat",
+                        Severity::Warning,
+                        ctx.file_path,
+                        &node,
+                        ctx.source,
+                        format!(
                             "函数过长：{} 行（上限 {}） | function too long: {} lines (max {})",
                             lines, max, lines, max
                         ),
-                        snippet: None,
-                    });
+                    ));
                 }
 
                 if let Some(params) = parameter_count(node, ctx.language) {
                     if params > max_params {
-                        findings.push(Finding {
-                            rule_id: "R02",
-                            rule_name: "structural-bloat",
-                            severity: Severity::Warning,
-                            location: Location {
-                                file: ctx.file_path.to_path_buf(),
-                                line: start.row + 1,
-                                column: start.column + 1,
-                            },
-                            message: format!(
+                        findings.push(Finding::new(
+                            "R02",
+                            "structural-bloat",
+                            Severity::Warning,
+                            ctx.file_path,
+                            &node,
+                            ctx.source,
+                            format!(
                                 "参数过多：{} 个（上限 {}） | too many parameters: {} (max {})",
                                 params, max_params, params, max_params
                             ),
-                            snippet: None,
-                        });
+                        ));
                     }
                 }
 
                 let depth = max_nesting_depth(node);
                 if depth > max_nesting {
-                    findings.push(Finding {
-                        rule_id: "R02",
-                        rule_name: "structural-bloat",
-                        severity: Severity::Warning,
-                        location: Location {
-                            file: ctx.file_path.to_path_buf(),
-                            line: start.row + 1,
-                            column: start.column + 1,
-                        },
-                        message: format!(
+                    findings.push(Finding::new(
+                        "R02",
+                        "structural-bloat",
+                        Severity::Warning,
+                        ctx.file_path,
+                        &node,
+                        ctx.source,
+                        format!(
                             "嵌套过深：{} 层（上限 {}） | nesting too deep: {} levels (max {})",
                             depth, max_nesting, depth, max_nesting
                         ),
-                        snippet: None,
-                    });
+                    ));
                 }
             }
         });
@@ -122,7 +112,7 @@ impl Rule for StructuralBloat {
 
 fn function_kinds(lang: Language) -> &'static [&'static str] {
     match lang {
-        Language::Rust => &["function_item", "function_definition"],
+        Language::Rust => &["function_item"],
         Language::Python => &["function_definition"],
         Language::TypeScript | Language::TypeScriptTsx => &[
             "function_declaration",
@@ -131,17 +121,6 @@ fn function_kinds(lang: Language) -> &'static [&'static str] {
         ],
         Language::CSharp => &["method_declaration", "constructor_declaration"],
         Language::Java => &["method_declaration", "constructor_declaration"],
-    }
-}
-
-fn walk_nodes<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
-    let mut stack = vec![node];
-    while let Some(n) = stack.pop() {
-        visit(n);
-        let mut cursor = n.walk();
-        for child in n.children(&mut cursor) {
-            stack.push(child);
-        }
     }
 }
 

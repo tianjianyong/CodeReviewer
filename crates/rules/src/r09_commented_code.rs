@@ -92,7 +92,7 @@ fn looks_like_code(content: &str) -> bool {
     if content.is_empty() {
         return false;
     }
-    let code_signals = [';', '{', '}', '=', '(', ')', ';', '<', '>'];
+    let code_signals = [';', '{', '}', '=', '(', ')', '<', '>'];
     let signal_count = content.chars().filter(|c| code_signals.contains(c)).count();
     signal_count >= 2
 }

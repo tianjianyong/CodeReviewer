@@ -6,7 +6,8 @@
 
 use std::collections::HashSet;
 
-use codereviewer_core::finding::{Finding, Location, Severity};
+use codereviewer_core::ast::{node_text, walk};
+use codereviewer_core::finding::{Finding, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
 
@@ -23,13 +24,8 @@ impl Rule for AsyncMissingAwait {
         Severity::Error
     }
     fn languages(&self) -> &'static [Language] {
-        &[
-            Language::Python,
-            Language::TypeScript,
-            Language::TypeScriptTsx,
-            Language::CSharp,
-            Language::Java,
-        ]
+        // C#/Java 的 async Task 方法缺少 await 需跨方法返回类型分析，暂不支持
+        &[Language::Python, Language::TypeScript, Language::TypeScriptTsx]
     }
 
     fn analyze(&self, ctx: &AnalysisContext) -> Result<Vec<Finding>, RuleError> {
@@ -44,7 +40,7 @@ impl Rule for AsyncMissingAwait {
 }
 
 fn find_python(ctx: &AnalysisContext, findings: &mut Vec<Finding>) {
-    let async_fns = collect_async_fn_names(ctx, "async", "function_definition");
+    let async_fns = collect_async_fn_names(ctx);
     if async_fns.is_empty() {
         return;
     }
@@ -65,22 +61,18 @@ fn find_python(ctx: &AnalysisContext, findings: &mut Vec<Finding>) {
         if is_awaited(&node, ctx) {
             return;
         }
-        let pos = node.start_position();
-        findings.push(Finding {
-            rule_id: "R18",
-            rule_name: "async-missing-await",
-            severity: Severity::Error,
-            location: Location {
-                file: ctx.file_path.to_path_buf(),
-                line: pos.row + 1,
-                column: pos.column + 1,
-            },
-            message: format!(
+        findings.push(Finding::new(
+            "R18",
+            "async-missing-await",
+            Severity::Error,
+            ctx.file_path,
+            &node,
+            ctx.source,
+            format!(
                 "async 函数 {} 的调用未加 await，返回 coroutine 而非结果 | call to async function {} without await, returns coroutine instead of result",
                 fname, fname
             ),
-            snippet: None,
-        });
+        ));
     });
 }
 
@@ -100,7 +92,6 @@ fn find_ts(ctx: &AnalysisContext, findings: &mut Vec<Finding>) {
         if is_awaited(&node, ctx) {
             return;
         }
-        let text = node_text(&node, ctx.source);
         // .then/.catch/.finally 链式也算处理
         let parent_text = node
             .parent()
@@ -112,30 +103,25 @@ fn find_ts(ctx: &AnalysisContext, findings: &mut Vec<Finding>) {
         {
             return;
         }
-        let _ = text;
-        let pos = node.start_position();
-        findings.push(Finding {
-            rule_id: "R18",
-            rule_name: "async-missing-await",
-            severity: Severity::Error,
-            location: Location {
-                file: ctx.file_path.to_path_buf(),
-                line: pos.row + 1,
-                column: pos.column + 1,
-            },
-            message: format!(
+        findings.push(Finding::new(
+            "R18",
+            "async-missing-await",
+            Severity::Error,
+            ctx.file_path,
+            &node,
+            ctx.source,
+            format!(
                 "async 函数 {} 的调用未加 await，返回 Promise 而非结果 | call to async function {} without await, returns Promise instead of result",
                 callee, callee
             ),
-            snippet: None,
-        });
+        ));
     });
 }
 
-fn collect_async_fn_names(ctx: &AnalysisContext, _kw: &str, fn_kind: &str) -> HashSet<String> {
+fn collect_async_fn_names(ctx: &AnalysisContext) -> HashSet<String> {
     let mut names = HashSet::new();
     walk(ctx.tree.root_node(), &mut |node| {
-        if node.kind() != fn_kind {
+        if node.kind() != "function_definition" {
             return;
         }
         // Python: async def foo  →  function_definition 前有 'async' 关键字
@@ -219,19 +205,4 @@ fn is_awaited(node: &tree_sitter::Node, ctx: &AnalysisContext) -> bool {
     parent_text.starts_with("await ")
         || parent_text.starts_with("await(")
         || parent_text.starts_with("await\t")
-}
-
-fn node_text<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
-    source.get(node.start_byte()..node.end_byte()).unwrap_or("")
-}
-
-fn walk<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
-    let mut stack = vec![node];
-    while let Some(n) = stack.pop() {
-        visit(n);
-        let mut cursor = n.walk();
-        for child in n.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
 }

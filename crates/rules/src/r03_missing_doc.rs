@@ -2,7 +2,8 @@
 //!
 //! 检测 public item（pub 关键字）无 doc comment。
 
-use codereviewer_core::finding::{Finding, Location, Severity};
+use codereviewer_core::ast::{node_text, walk};
+use codereviewer_core::finding::{Finding, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
 
@@ -36,29 +37,21 @@ impl Rule for MissingDoc {
         walk(ctx.tree.root_node(), &mut |node| {
             if public_kinds.contains(&node.kind()) && is_public(&node, ctx) {
                 if !has_doc_comment(&node, ctx) {
-                    let pos = node.start_position();
-                    findings.push(Finding {
-                        rule_id: "R03",
-                        rule_name: "missing-doc",
-                        severity: Severity::Warning,
-                        location: Location {
-                            file: ctx.file_path.to_path_buf(),
-                            line: pos.row + 1,
-                            column: pos.column + 1,
-                        },
-                        message: format!("公开项缺少文档注释：{} | public item without doc comment: {}", node.kind(), node.kind()),
-                        snippet: None,
-                    });
+                    findings.push(Finding::new(
+                        "R03",
+                        "missing-doc",
+                        Severity::Warning,
+                        ctx.file_path,
+                        &node,
+                        ctx.source,
+                        format!("公开项缺少文档注释：{} | public item without doc comment: {}", node.kind(), node.kind()),
+                    ));
                 }
             }
         });
 
         Ok(findings)
     }
-}
-
-fn node_text<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
-    source.get(node.start_byte()..node.end_byte()).unwrap_or("")
 }
 
 fn public_kinds(lang: Language) -> &'static [&'static str] {
@@ -119,7 +112,6 @@ fn has_doc_comment(node: &tree_sitter::Node, ctx: &AnalysisContext) -> bool {
                 || text.starts_with("/**")
                 || text.starts_with("//!")
                 || text.starts_with("\"\"\"")
-                || text.starts_with("/**")
             {
                 return true;
             }
@@ -131,15 +123,4 @@ fn has_doc_comment(node: &tree_sitter::Node, ctx: &AnalysisContext) -> bool {
         }
     }
     false
-}
-
-fn walk<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
-    let mut stack = vec![node];
-    while let Some(n) = stack.pop() {
-        visit(n);
-        let mut cursor = n.walk();
-        for child in n.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
 }

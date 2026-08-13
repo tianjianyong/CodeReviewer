@@ -2,7 +2,8 @@
 //!
 //! 启发式：测试只断言状态码，不验证副作用或响应体内容。
 
-use codereviewer_core::finding::{Finding, Location, Severity};
+use codereviewer_core::ast::{node_text, walk};
+use codereviewer_core::finding::{Finding, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
 
@@ -38,22 +39,18 @@ impl Rule for ShallowIntegration {
             if function_kinds.contains(&node.kind()) && is_integration_test(&node, ctx) {
                 let checks = count_meaningful_checks(&node, ctx);
                 if checks < min_checks {
-                    let pos = node.start_position();
-                    findings.push(Finding {
-                        rule_id: "R05",
-                        rule_name: "shallow-integration-test",
-                        severity: Severity::Warning,
-                        location: Location {
-                            file: ctx.file_path.to_path_buf(),
-                            line: pos.row + 1,
-                            column: pos.column + 1,
-                        },
-                        message: format!(
+                    findings.push(Finding::new(
+                        "R05",
+                        "shallow-integration-test",
+                        Severity::Warning,
+                        ctx.file_path,
+                        &node,
+                        ctx.source,
+                        format!(
                             "集成测试仅有 {} 处有效校验（下限 {}） | integration test has only {} meaningful check(s) (min {})",
                             checks, min_checks, checks, min_checks
                         ),
-                        snippet: None,
-                    });
+                    ));
                 }
             }
         });
@@ -96,7 +93,7 @@ fn count_meaningful_checks(node: &tree_sitter::Node, ctx: &AnalysisContext) -> u
     let text = node_text(node, ctx.source);
     let shallow_signals = [
         "status()", "is_success", "is_ok", "is_success()", "status_code",
-        "assert_ok", "is_success", "Ok(", "unwrap()", "expect(",
+        "assert_ok", "Ok(", "unwrap()", "expect(",
     ];
     let deep_signals = [
         "json(", "body", "header", "content", "contains", "eq(",
@@ -120,19 +117,4 @@ fn extract_name(node: &tree_sitter::Node, ctx: &AnalysisContext) -> String {
         }
     }
     String::new()
-}
-
-fn node_text<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
-    source.get(node.start_byte()..node.end_byte()).unwrap_or("")
-}
-
-fn walk<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
-    let mut stack = vec![node];
-    while let Some(n) = stack.pop() {
-        visit(n);
-        let mut cursor = n.walk();
-        for child in n.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
 }

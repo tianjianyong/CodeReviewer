@@ -2,7 +2,8 @@
 //!
 //! 启发式信号：单实现 trait、过度泛型化。
 
-use codereviewer_core::finding::{Finding, Location, Severity};
+use codereviewer_core::ast::{node_text, walk};
+use codereviewer_core::finding::{Finding, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
 
@@ -39,61 +40,70 @@ impl Rule for OverEngineering {
     }
 }
 
-struct TraitInfo {
+struct TraitInfo<'a> {
     name: String,
-    line: usize,
-    column: usize,
+    node: tree_sitter::Node<'a>,
 }
 
-fn detect_single_impl_traits(ctx: &AnalysisContext) -> Vec<Finding> {
-    let mut traits: Vec<TraitInfo> = Vec::new();
-    let mut impl_texts: Vec<String> = Vec::new();
+fn detect_single_impl_traits<'a>(ctx: &'a AnalysisContext<'a>) -> Vec<Finding> {
+    let mut traits: Vec<TraitInfo<'a>> = Vec::new();
+    let mut impl_names: Vec<String> = Vec::new();
 
-    walk(ctx.tree.root_node(), &mut |node| {
+    // 内联栈遍历：Node<'a> 无法安全地经 FnMut 闭包存入外部 Vec（&mut 不变性限制）
+    let mut stack = vec![ctx.tree.root_node()];
+    while let Some(node) = stack.pop() {
         if node.kind() == "trait_item" {
             if let Some(name) = extract_trait_name(&node, ctx) {
-                let pos = node.start_position();
-                traits.push(TraitInfo {
-                    name,
-                    line: pos.row + 1,
-                    column: pos.column + 1,
-                });
+                traits.push(TraitInfo { name, node });
             }
         }
         if node.kind() == "impl_item" {
-            let text = node_text(&node, ctx.source).to_string();
-            impl_texts.push(text);
+            if let Some(name) = extract_impl_trait_name(&node, ctx) {
+                impl_names.push(name);
+            }
         }
-    });
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
 
     let mut findings = Vec::new();
     for tr in &traits {
-        let impl_count = impl_texts
-            .iter()
-            .filter(|text| {
-                text.contains(&format!("impl {}", tr.name))
-                    || text.contains(&format!("impl<{}> {}", tr.name, tr.name))
-            })
-            .count();
+        let impl_count = impl_names.iter().filter(|n| *n == &tr.name).count();
         if impl_count <= 1 {
-            findings.push(Finding {
-                rule_id: "R06",
-                rule_name: "over-engineering",
-                severity: Severity::Info,
-                location: Location {
-                    file: ctx.file_path.to_path_buf(),
-                    line: tr.line,
-                    column: tr.column,
-                },
-                message: format!(
+            findings.push(Finding::new(
+                "R06",
+                "over-engineering",
+                Severity::Info,
+                ctx.file_path,
+                &tr.node,
+                ctx.source,
+                format!(
                     "trait {} 仅有 {} 处实现——请考虑是否需要此抽象 | trait {} has only {} implementation(s) - consider if abstraction is needed",
                     tr.name, impl_count, tr.name, impl_count
                 ),
-                snippet: None,
-            });
+            ));
         }
     }
     findings
+}
+
+/// 提取 impl 块的 trait 名：`impl Trait for X` 中 for 之前的 type_identifier；
+/// 无 for 的是固有 impl（impl Struct），不属于 trait 实现，跳过。
+fn extract_impl_trait_name(node: &tree_sitter::Node, ctx: &AnalysisContext) -> Option<String> {
+    let mut cursor = node.walk();
+    let children: Vec<tree_sitter::Node> = node.children(&mut cursor).collect();
+    let for_pos = children.iter().position(|c| c.kind() == "for")?;
+    children[..for_pos].iter().rev().find_map(|c| {
+        if c.kind() == "type_identifier" || c.kind() == "scoped_type_identifier" {
+            let text = node_text(c, ctx.source);
+            // scoped 名取最后一段：std::io::Read -> Read
+            Some(text.rsplit("::").next().unwrap_or(text).to_string())
+        } else {
+            None
+        }
+    })
 }
 
 fn detect_excess_generics(ctx: &AnalysisContext) -> Vec<Finding> {
@@ -103,22 +113,18 @@ fn detect_excess_generics(ctx: &AnalysisContext) -> Vec<Finding> {
         if node.kind() == "type_parameters" {
             let count = node.named_child_count();
             if count > max_generics {
-                let pos = node.start_position();
-                findings.push(Finding {
-                    rule_id: "R06",
-                    rule_name: "over-engineering",
-                    severity: Severity::Info,
-                    location: Location {
-                        file: ctx.file_path.to_path_buf(),
-                        line: pos.row + 1,
-                        column: pos.column + 1,
-                    },
-                    message: format!(
+                findings.push(Finding::new(
+                    "R06",
+                    "over-engineering",
+                    Severity::Info,
+                    ctx.file_path,
+                    &node,
+                    ctx.source,
+                    format!(
                         "泛型过多：{} 个类型参数（上限 {}） | excessive generics: {} type parameters (max {})",
                         count, max_generics, count, max_generics
                     ),
-                    snippet: None,
-                });
+                ));
             }
         }
     });
@@ -133,19 +139,4 @@ fn extract_trait_name(node: &tree_sitter::Node, ctx: &AnalysisContext) -> Option
         }
     }
     None
-}
-
-fn node_text<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
-    source.get(node.start_byte()..node.end_byte()).unwrap_or("")
-}
-
-fn walk<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
-    let mut stack = vec![node];
-    while let Some(n) = stack.pop() {
-        visit(n);
-        let mut cursor = n.walk();
-        for child in n.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
 }

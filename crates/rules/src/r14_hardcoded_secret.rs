@@ -4,7 +4,8 @@
 //! 启发式：(1) 已知前缀（sk-/ghp_/AKIA/xoxb-/AIza/BEGIN PRIVATE KEY）；
 //! (2) 高熵字符串（≥20 字符 base64/hex）赋给 secret 命名变量。
 
-use codereviewer_core::finding::{Finding, Location, Severity};
+use codereviewer_core::ast::{node_text, walk};
+use codereviewer_core::finding::{Finding, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
 
@@ -60,22 +61,18 @@ impl Rule for HardcodedSecret {
                     return;
                 }
             }
-            let pos = node.start_position();
-            findings.push(Finding {
-                rule_id: "R14",
-                rule_name: "hardcoded-secret",
-                severity: Severity::Error,
-                location: Location {
-                    file: ctx.file_path.to_path_buf(),
-                    line: pos.row + 1,
-                    column: pos.column + 1,
-                },
-                message: format!(
+            findings.push(Finding::new(
+                "R14",
+                "hardcoded-secret",
+                Severity::Error,
+                ctx.file_path,
+                &node,
+                ctx.source,
+                format!(
                     "疑似硬编码密钥（{}）：{} | suspected hardcoded secret ({}): {}",
                     reason_zh(reason), inner, reason_en(reason), inner
                 ),
-                snippet: None,
-            });
+            ));
         });
 
         Ok(findings)
@@ -227,19 +224,4 @@ fn is_test_file(path: &std::path::Path) -> bool {
         || name.contains("_test.")
         || name.contains(".test.")
         || name.contains(".spec.")
-}
-
-fn node_text<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
-    source.get(node.start_byte()..node.end_byte()).unwrap_or("")
-}
-
-fn walk<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
-    let mut stack = vec![node];
-    while let Some(n) = stack.pop() {
-        visit(n);
-        let mut cursor = n.walk();
-        for child in n.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
 }

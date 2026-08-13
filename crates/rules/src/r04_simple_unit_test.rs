@@ -2,7 +2,8 @@
 //!
 //! 启发式：测试函数中断言密度低、只覆盖 happy path。
 
-use codereviewer_core::finding::{Finding, Location, Severity};
+use codereviewer_core::ast::{node_text, walk};
+use codereviewer_core::finding::{Finding, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
 
@@ -39,22 +40,18 @@ impl Rule for SimpleUnitTest {
                 let name = extract_function_name(&node, ctx);
                 let assert_count = count_assertions(&node, ctx);
                 if assert_count < min_asserts {
-                    let pos = node.start_position();
-                    findings.push(Finding {
-                        rule_id: "R04",
-                        rule_name: "simple-unit-test",
-                        severity: Severity::Warning,
-                        location: Location {
-                            file: ctx.file_path.to_path_buf(),
-                            line: pos.row + 1,
-                            column: pos.column + 1,
-                        },
-                        message: format!(
+                    findings.push(Finding::new(
+                        "R04",
+                        "simple-unit-test",
+                        Severity::Warning,
+                        ctx.file_path,
+                        &node,
+                        ctx.source,
+                        format!(
                             "测试 '{}' 仅有 {} 条断言（下限 {}） | test '{}' has only {} assertion(s) (min {})",
                             name, assert_count, min_asserts, name, assert_count, min_asserts
                         ),
-                        snippet: None,
-                    });
+                    ));
                 }
             }
         });
@@ -205,19 +202,4 @@ fn count_expect_calls(node: &tree_sitter::Node, ctx: &AnalysisContext) -> usize 
         }
     });
     count
-}
-
-fn node_text<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
-    source.get(node.start_byte()..node.end_byte()).unwrap_or("")
-}
-
-fn walk<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
-    let mut stack = vec![node];
-    while let Some(n) = stack.pop() {
-        visit(n);
-        let mut cursor = n.walk();
-        for child in n.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
 }

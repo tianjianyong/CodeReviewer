@@ -2,6 +2,7 @@
 //!
 //! 用 AST 只扫描 comment 节点，不扫标识符或代码。
 
+use codereviewer_core::ast::{node_text, walk};
 use codereviewer_core::finding::{Finding, Location, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
@@ -66,22 +67,7 @@ fn comment_kinds(lang: Language) -> &'static [&'static str] {
         Language::Rust => &["line_comment", "block_comment", "documentation"],
         Language::Python => &["comment"],
         Language::TypeScript | Language::TypeScriptTsx => &["comment"],
-        Language::CSharp => &["comment", "extern_alias_directive"],
+        Language::CSharp => &["comment"],
         Language::Java => &["comment", "block_comment", "line_comment"],
-    }
-}
-
-fn node_text<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
-    source.get(node.start_byte()..node.end_byte()).unwrap_or("")
-}
-
-fn walk<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
-    let mut stack = vec![node];
-    while let Some(n) = stack.pop() {
-        visit(n);
-        let mut cursor = n.walk();
-        for child in n.children(&mut cursor) {
-            stack.push(child);
-        }
     }
 }

@@ -4,6 +4,7 @@
 
 use std::collections::HashSet;
 
+use codereviewer_core::ast::{node_text, walk};
 use codereviewer_core::finding::{Finding, Location, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
@@ -232,20 +233,6 @@ fn collect_used_identifiers(ctx: &AnalysisContext) -> HashSet<String> {
     used
 }
 
-fn node_text<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
-    source.get(node.start_byte()..node.end_byte()).unwrap_or("")
-}
-
-fn walk<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
-    let mut stack = vec![node];
-    while let Some(n) = stack.pop() {
-        visit(n);
-        let mut cursor = n.walk();
-        for child in n.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {

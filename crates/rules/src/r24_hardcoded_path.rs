@@ -3,7 +3,8 @@
 //! 检测源码中硬编码的绝对路径或带 host 的 URL（非测试文件、非 env/config 包裹）。
 //! AI 常把 prompt 里的本地环境路径/URL 复制进代码。
 
-use codereviewer_core::finding::{Finding, Location, Severity};
+use codereviewer_core::ast::{line_of, node_text, walk};
+use codereviewer_core::finding::{Finding, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
 
@@ -49,22 +50,18 @@ impl Rule for HardcodedPathOrUrl {
                 if env_signals.iter().any(|s| line_text.contains(s)) {
                     return;
                 }
-                let pos = node.start_position();
-                findings.push(Finding {
-                    rule_id: "R24",
-                    rule_name: "hardcoded-path-or-url",
-                    severity: Severity::Warning,
-                    location: Location {
-                        file: ctx.file_path.to_path_buf(),
-                        line: pos.row + 1,
-                        column: pos.column + 1,
-                    },
-                    message: format!(
+                findings.push(Finding::new(
+                    "R24",
+                    "hardcoded-path-or-url",
+                    Severity::Warning,
+                    ctx.file_path,
+                    &node,
+                    ctx.source,
+                    format!(
                         "硬编码{}：{} | hardcoded {}: {}",
                         kind_zh(kind), inner, kind_en(kind), inner
                     ),
-                    snippet: None,
-                });
+                ));
             }
         });
 
@@ -179,23 +176,4 @@ fn is_test_file(path: &std::path::Path) -> bool {
         || name.contains("_test.")
         || name.contains(".test.")
         || name.contains(".spec.")
-}
-
-fn line_of(source: &str, row: usize) -> &str {
-    source.lines().nth(row).unwrap_or("")
-}
-
-fn node_text<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
-    source.get(node.start_byte()..node.end_byte()).unwrap_or("")
-}
-
-fn walk<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
-    let mut stack = vec![node];
-    while let Some(n) = stack.pop() {
-        visit(n);
-        let mut cursor = n.walk();
-        for child in n.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
 }

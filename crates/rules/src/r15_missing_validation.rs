@@ -4,7 +4,8 @@
 //! 或除以 len()，且函数体内无 is_empty/len() > 边界守护。
 //! happy-path 幻觉——AI 处理完美输入，忽略空/越界。
 
-use codereviewer_core::finding::{Finding, Location, Severity};
+use codereviewer_core::ast::{node_text, walk};
+use codereviewer_core::finding::{Finding, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
 
@@ -54,22 +55,18 @@ impl Rule for MissingInputValidation {
             // 检测危险操作：除以 len() / 索引 param[i]
             let danger = find_dangerous_op(&node, &params, ctx);
             if let Some(desc) = danger {
-                let pos = node.start_position();
-                findings.push(Finding {
-                    rule_id: "R15",
-                    rule_name: "missing-input-validation",
-                    severity: Severity::Warning,
-                    location: Location {
-                        file: ctx.file_path.to_path_buf(),
-                        line: pos.row + 1,
-                        column: pos.column + 1,
-                    },
-                    message: format!(
+                findings.push(Finding::new(
+                    "R15",
+                    "missing-input-validation",
+                    Severity::Warning,
+                    ctx.file_path,
+                    &node,
+                    ctx.source,
+                    format!(
                         "边界函数对参数 {} 无空值/越界校验即进行危险操作（{}） | boundary function performs {} on param {} without empty/bounds validation",
                         desc.0, desc.1, desc.1, desc.0
                     ),
-                    snippet: None,
-                });
+                ));
             }
         });
 
@@ -218,19 +215,4 @@ fn has_variable_index(func_node: &tree_sitter::Node, param: &str, ctx: &Analysis
         }
     });
     found
-}
-
-fn node_text<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
-    source.get(node.start_byte()..node.end_byte()).unwrap_or("")
-}
-
-fn walk<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
-    let mut stack = vec![node];
-    while let Some(n) = stack.pop() {
-        visit(n);
-        let mut cursor = n.walk();
-        for child in n.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
 }

@@ -2,7 +2,8 @@
 //!
 //! 检测未命名的数字/字符串字面量，排除常见值与属性/宏/match pattern 上下文。
 
-use codereviewer_core::finding::{Finding, Location, Severity};
+use codereviewer_core::ast::{node_text, walk};
+use codereviewer_core::finding::{Finding, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
 
@@ -50,19 +51,15 @@ impl Rule for MagicNumber {
             if !is_magic(node.kind(), text, min_string_len) {
                 return;
             }
-            let pos = node.start_position();
-            findings.push(Finding {
-                rule_id: "R10",
-                rule_name: "magic-number",
-                severity: Severity::Info,
-                location: Location {
-                    file: ctx.file_path.to_path_buf(),
-                    line: pos.row + 1,
-                    column: pos.column + 1,
-                },
-                message: format!("魔法字面量：{} | magic literal: {}", text, text),
-                snippet: None,
-            });
+            findings.push(Finding::new(
+                "R10",
+                "magic-number",
+                Severity::Info,
+                ctx.file_path,
+                &node,
+                ctx.source,
+                format!("魔法字面量：{} | magic literal: {}", text, text),
+            ));
         });
 
         Ok(findings)
@@ -148,21 +145,6 @@ fn is_magic(kind: &str, text: &str, min_string_len: usize) -> bool {
     }
     let n: i64 = text.trim().parse().unwrap_or(0);
     !matches!(n, 0 | 1 | -1 | 2 | 10 | 100 | 1000)
-}
-
-fn node_text<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
-    source.get(node.start_byte()..node.end_byte()).unwrap_or("")
-}
-
-fn walk<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
-    let mut stack = vec![node];
-    while let Some(n) = stack.pop() {
-        visit(n);
-        let mut cursor = n.walk();
-        for child in n.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
 }
 
 #[cfg(test)]

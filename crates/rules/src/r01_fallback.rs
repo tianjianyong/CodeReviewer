@@ -4,7 +4,8 @@
 //! Python: AST 检测 except_clause (bare except 或 except Exception)。
 //! TypeScript/C#/Java: AST 检测 catch_clause 内有 return。
 
-use codereviewer_core::finding::{Finding, Location, Severity};
+use codereviewer_core::ast::{node_text, walk};
+use codereviewer_core::finding::{Finding, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
 
@@ -90,14 +91,8 @@ fn find_python_fallbacks(ctx: &AnalysisContext, findings: &mut Vec<Finding>) {
 }
 
 fn find_catch_fallbacks(ctx: &AnalysisContext, findings: &mut Vec<Finding>, message: &str) {
-    let catch_kind = match ctx.language {
-        Language::TypeScript | Language::TypeScriptTsx => "catch_clause",
-        Language::CSharp => "catch_clause",
-        Language::Java => "catch_clause",
-        _ => return,
-    };
     walk(ctx.tree.root_node(), &mut |node| {
-        if node.kind() == catch_kind && has_return_in_subtree(&node) {
+        if node.kind() == "catch_clause" && has_return_in_subtree(&node) {
             push_finding(findings, ctx, &node, message);
         }
     });
@@ -118,32 +113,14 @@ fn has_return_in_subtree(node: &tree_sitter::Node) -> bool {
 }
 
 fn push_finding(findings: &mut Vec<Finding>, ctx: &AnalysisContext, node: &tree_sitter::Node, message: &str) {
-    let pos = node.start_position();
-    findings.push(Finding {
-        rule_id: "R01",
-        rule_name: "fallback-masks-error",
-        severity: Severity::Error,
-        location: Location {
-            file: ctx.file_path.to_path_buf(),
-            line: pos.row + 1,
-            column: pos.column + 1,
-        },
-        message: message.to_string(),
-        snippet: None,
-    });
+    findings.push(Finding::new(
+        "R01",
+        "fallback-masks-error",
+        Severity::Error,
+        ctx.file_path,
+        node,
+        ctx.source,
+        message.to_string(),
+    ));
 }
 
-fn node_text<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
-    source.get(node.start_byte()..node.end_byte()).unwrap_or("")
-}
-
-fn walk<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
-    let mut stack = vec![node];
-    while let Some(n) = stack.pop() {
-        visit(n);
-        let mut cursor = n.walk();
-        for child in n.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
-}

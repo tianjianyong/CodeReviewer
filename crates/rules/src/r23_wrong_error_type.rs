@@ -4,7 +4,8 @@
 //! 且不引用异常变量——丢失了本应区分的错误信息。
 //! 与 R01 互补：R01 是吞错误，R23 是错误有传播但类型丢信息。
 
-use codereviewer_core::finding::{Finding, Location, Severity};
+use codereviewer_core::ast::{node_text, walk};
+use codereviewer_core::finding::{Finding, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
 
@@ -21,8 +22,8 @@ impl Rule for WrongErrorTypePropagation {
         Severity::Warning
     }
     fn languages(&self) -> &'static [Language] {
+        // Rust 无 catch/except 语法
         &[
-            Language::Rust,
             Language::Python,
             Language::TypeScript,
             Language::TypeScriptTsx,
@@ -44,27 +45,23 @@ impl Rule for WrongErrorTypePropagation {
             }
             let body_text = node_text(&node, ctx.source);
             let exc_var = exception_var(&node, ctx);
-            // 体内引用了异常变量 → 在用信息，不报
-            if !exc_var.is_empty() && body_text.matches(&exc_var).count() > 1 {
+            // 头部之后的体内按词边界引用了异常变量 → 在用信息，不报
+            if !exc_var.is_empty() && body_uses_word(&body_text, &exc_var) {
                 return;
             }
             if returns_generic(&node, ctx) {
-                let pos = node.start_position();
-                findings.push(Finding {
-                    rule_id: "R23",
-                    rule_name: "wrong-error-type-propagation",
-                    severity: Severity::Warning,
-                    location: Location {
-                        file: ctx.file_path.to_path_buf(),
-                        line: pos.row + 1,
-                        column: pos.column + 1,
-                    },
-                    message: format!(
+                findings.push(Finding::new(
+                    "R23",
+                    "wrong-error-type-propagation",
+                    Severity::Warning,
+                    ctx.file_path,
+                    &node,
+                    ctx.source,
+                    format!(
                         "宽泛 {} 返回固定值且不引用异常变量，丢失错误类型信息 | broad catch returns fixed value without inspecting exception, loses error type info",
                         catch_kind
                     ),
-                    snippet: None,
-                });
+                ));
             }
         });
 
@@ -127,17 +124,34 @@ fn returns_generic(node: &tree_sitter::Node, ctx: &AnalysisContext) -> bool {
     generic_returns.iter().any(|g| text.contains(g))
 }
 
-fn node_text<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
-    source.get(node.start_byte()..node.end_byte()).unwrap_or("")
+/// 在 catch 头部之后（':' 或 '{' 后）检查异常变量是否被使用。
+/// 此前实现直接在头部文本上 counts，"except Exception as e" 里的 "e" 总是命中，
+/// 导致带异常变量的常见写法永远不会被报。
+fn body_uses_word(text: &str, word: &str) -> bool {
+    let body = text
+        .find(':')
+        .or_else(|| text.find('{'))
+        .map(|i| &text[i + 1..])
+        .unwrap_or("");
+    contains_word(body, word)
 }
 
-fn walk<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
-    let mut stack = vec![node];
-    while let Some(n) = stack.pop() {
-        visit(n);
-        let mut cursor = n.walk();
-        for child in n.children(&mut cursor) {
-            stack.push(child);
-        }
+/// 词边界包含：避免 "e" 命中 "return"、"error"。
+fn contains_word(text: &str, word: &str) -> bool {
+    fn is_word_char(c: char) -> bool {
+        c.is_alphanumeric() || c == '_'
     }
+    let mut rest = text;
+    while let Some(pos) = rest.find(word) {
+        let end = pos + word.len();
+        let before_ok = pos == 0
+            || !rest[..pos].chars().last().map(is_word_char).unwrap_or(false);
+        let after_ok = end >= rest.len()
+            || !rest[end..].chars().next().map(is_word_char).unwrap_or(false);
+        if before_ok && after_ok {
+            return true;
+        }
+        rest = &rest[pos + 1..];
+    }
+    false
 }

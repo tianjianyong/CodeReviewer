@@ -3,7 +3,8 @@
 //! 启发式：(1) Some(...)/Ok(...) 字面量上调用 unwrap_or/unwrap_or_default/unwrap_or_else；
 //! (2) TS/Java try 块仅包纯算术/属性访问等不可失败操作。
 
-use codereviewer_core::finding::{Finding, Location, Severity};
+use codereviewer_core::ast::{node_text, walk};
+use codereviewer_core::finding::{Finding, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
 
@@ -20,14 +21,8 @@ impl Rule for OverlyDefensiveHandling {
         Severity::Info
     }
     fn languages(&self) -> &'static [Language] {
-        &[
-            Language::Rust,
-            Language::Python,
-            Language::TypeScript,
-            Language::TypeScriptTsx,
-            Language::CSharp,
-            Language::Java,
-        ]
+        // Python/C#/Java 的过度防御模式未实现
+        &[Language::Rust, Language::TypeScript, Language::TypeScriptTsx]
     }
 
     fn analyze(&self, ctx: &AnalysisContext) -> Result<Vec<Finding>, RuleError> {
@@ -57,22 +52,18 @@ fn find_rust_unwrap_on_literal(ctx: &AnalysisContext, findings: &mut Vec<Finding
         let receiver = extract_receiver(&node, ctx);
         let trimmed = receiver.trim();
         if trimmed.starts_with("Some(") || trimmed.starts_with("Ok(") {
-            let pos = node.start_position();
-            findings.push(Finding {
-                rule_id: "R28",
-                rule_name: "overly-defensive-handling",
-                severity: Severity::Info,
-                location: Location {
-                    file: ctx.file_path.to_path_buf(),
-                    line: pos.row + 1,
-                    column: pos.column + 1,
-                },
-                message: format!(
+            findings.push(Finding::new(
+                "R28",
+                "overly-defensive-handling",
+                Severity::Info,
+                ctx.file_path,
+                &node,
+                ctx.source,
+                format!(
                     "对 {} 调用 {} 是过度防御——该值类型上保证不可失败 | {} on {} is overly defensive — value cannot fail",
                     trimmed, method, method, trimmed
                 ),
-                snippet: None,
-            });
+            ));
         }
     });
 }
@@ -90,22 +81,18 @@ fn find_ts_nullish_on_literal(ctx: &AnalysisContext, findings: &mut Vec<Finding>
         let left = left.trim();
         // 字面量左侧不可空
         if left.starts_with('"') || left.starts_with('\'') || left.chars().all(|c| c.is_ascii_digit()) {
-            let pos = node.start_position();
-            findings.push(Finding {
-                rule_id: "R28",
-                rule_name: "overly-defensive-handling",
-                severity: Severity::Info,
-                location: Location {
-                    file: ctx.file_path.to_path_buf(),
-                    line: pos.row + 1,
-                    column: pos.column + 1,
-                },
-                message: format!(
+            findings.push(Finding::new(
+                "R28",
+                "overly-defensive-handling",
+                Severity::Info,
+                ctx.file_path,
+                &node,
+                ctx.source,
+                format!(
                     "对不可空字面量 {} 使用 ?? 是过度防御 | ?? on non-null literal {} is overly defensive",
                     left, left
                 ),
-                snippet: None,
-            });
+            ));
         }
     });
 }
@@ -124,19 +111,4 @@ fn extract_receiver(node: &tree_sitter::Node, ctx: &AnalysisContext) -> String {
         }
     }
     String::new()
-}
-
-fn node_text<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
-    source.get(node.start_byte()..node.end_byte()).unwrap_or("")
-}
-
-fn walk<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
-    let mut stack = vec![node];
-    while let Some(n) = stack.pop() {
-        visit(n);
-        let mut cursor = n.walk();
-        for child in n.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
 }

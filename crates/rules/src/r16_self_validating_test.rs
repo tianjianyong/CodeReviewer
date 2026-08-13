@@ -4,7 +4,8 @@
 //! 或测试访问被测单元的私有成员（_foo/__foo/#foo）。
 //! 与 R04/R05 互补——断言够多但仍只测了实现视角。
 
-use codereviewer_core::finding::{Finding, Location, Severity};
+use codereviewer_core::ast::{node_text, walk};
+use codereviewer_core::finding::{Finding, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
 
@@ -44,41 +45,33 @@ impl Rule for SelfValidatingTest {
             }
             let name = extract_function_name(&node, ctx);
             if has_vague_name(&name) {
-                let pos = node.start_position();
-                findings.push(Finding {
-                    rule_id: "R16",
-                    rule_name: "self-validating-test",
-                    severity: Severity::Warning,
-                    location: Location {
-                        file: ctx.file_path.to_path_buf(),
-                        line: pos.row + 1,
-                        column: pos.column + 1,
-                    },
-                    message: format!(
+                findings.push(Finding::new(
+                    "R16",
+                    "self-validating-test",
+                    Severity::Warning,
+                    ctx.file_path,
+                    &node,
+                    ctx.source,
+                    format!(
                         "测试名 '{}' 只描述方法未描述行为（建议加 _when_/_should_ 等行为后缀） | test '{}' name describes method not behavior (add _when_/_should_ suffix)",
                         name, name
                     ),
-                    snippet: None,
-                });
+                ));
                 return;
             }
             if let Some(member) = first_private_member_access(&node, ctx) {
-                let pos = node.start_position();
-                findings.push(Finding {
-                    rule_id: "R16",
-                    rule_name: "self-validating-test",
-                    severity: Severity::Warning,
-                    location: Location {
-                        file: ctx.file_path.to_path_buf(),
-                        line: pos.row + 1,
-                        column: pos.column + 1,
-                    },
-                    message: format!(
+                findings.push(Finding::new(
+                    "R16",
+                    "self-validating-test",
+                    Severity::Warning,
+                    ctx.file_path,
+                    &node,
+                    ctx.source,
+                    format!(
                         "测试访问被测单元的私有成员 '{}'，可能只验证实现内部状态 | test accesses private member '{}' of unit under test",
                         member, member
                     ),
-                    snippet: None,
-                });
+                ));
             }
         });
 
@@ -176,19 +169,4 @@ fn extract_function_name(node: &tree_sitter::Node, ctx: &AnalysisContext) -> Str
         }
     }
     String::new()
-}
-
-fn node_text<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
-    source.get(node.start_byte()..node.end_byte()).unwrap_or("")
-}
-
-fn walk<F: FnMut(tree_sitter::Node)>(node: tree_sitter::Node, visit: &mut F) {
-    let mut stack = vec![node];
-    while let Some(n) = stack.pop() {
-        visit(n);
-        let mut cursor = n.walk();
-        for child in n.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
 }
