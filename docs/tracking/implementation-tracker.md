@@ -208,3 +208,4 @@ pwsh -Command "cargo build"
 | 2026-06-21 | Phase 4 关键项完成：README + opencode skill + 配置查找改进；MVP 全部交付 |
 | 2026-06-22 | AI 专项规则批次：R14/R15/R16/R18/R19/R20/R23/R24/R28 落地（19 条规则） |
 | 2026-08-13 | 代码审计整改：排除误伤修复、路径校验、CLI 参数校验、退出码、R07/R19/R23/R06 规则 bug 修复、共享 ast 工具、单次读取、gitignore 继承、parse_errors 上报、MCP 读配置、并行分析（rayon）、clippy 清零、CI + LICENSE；R23 支持 as_pattern；llm 空壳与 RuleError::Failed 删除 |
+| 2026-08-13 | 真实项目校准：NavisworksTransport 四轮 AI agent 反馈驱动规则校准（error 407→40，详见 docs/case-studies/navisworkstransport-calibration.md）；报告导出（md/json/--output/--baseline）
