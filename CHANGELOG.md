@@ -24,6 +24,8 @@
 
 ### 变更（Changed）
 
+- 规则校准（实测驱动）：R01 catch+return 按有无日志拆两档（无日志 error / 有日志 info 防御式处理）；R10 只报数字字面量（字符串误报率高，已移除）并跳过 GetHashCode/hashCode 哈希种子；R04 默认阈值降为 1（只报无断言测试）；R09 说明性注释（注意/说明/TODO 等）不计入注释代码块；规则级 `exclude_files` 文件排除（如测试基础设施退出 R24）
+
 - 抽取共享 `core::ast` 工具（`walk`/`node_text`/`line_of`）与 `Finding::new`（自动带 snippet），规则层净减 334 行
 - 文件只读一次；`.gitignore` 模式继承到子目录；排除模式每次扫描只计算一次
 - MCP server 与 CLI 共用 `.codereviewer.toml` 配置加载（此前 MCP 恒用默认配置）；配置发现锚定扫描路径（向上一层查找，回退当前目录）

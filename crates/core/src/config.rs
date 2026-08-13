@@ -27,11 +27,26 @@ pub struct RuleConfig {
     pub severity: Option<String>,
     #[serde(default)]
     pub thresholds: HashMap<String, toml::Value>,
+    /// 本规则跳过的文件（文件名子串匹配，不区分大小写）
+    #[serde(default)]
+    pub exclude_files: Vec<String>,
 }
 
 impl RuleConfig {
     pub fn is_enabled(&self) -> bool {
         self.enabled
+    }
+
+    /// 文件是否被本规则排除。
+    pub fn excludes_file(&self, file: &Path) -> bool {
+        let name = file
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        self.exclude_files
+            .iter()
+            .any(|p| name.contains(&p.to_lowercase()))
     }
 
     pub fn threshold_i64(&self, key: &str, default: i64) -> i64 {
@@ -85,5 +100,20 @@ fn find_up_from(start: &Path) -> Option<std::path::PathBuf> {
             Some(parent) => current = parent,
             None => return None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn excludes_file_matches_file_name_substring_case_insensitive() {
+        let cfg = RuleConfig {
+            exclude_files: vec!["testautomationclient".to_string()],
+            ..Default::default()
+        };
+        assert!(cfg.excludes_file(Path::new("src/NavisworksTestAutomationClient.cs")));
+        assert!(!cfg.excludes_file(Path::new("src/Commands/AutoPathPlanningCommand.cs")));
     }
 }

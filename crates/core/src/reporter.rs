@@ -180,21 +180,30 @@ impl Report {
             }
         }
 
-        out.push_str("## 其他问题一览\n\n| 规则 | 严重级 | 数量 |\n|---|---|---|\n");
+        out.push_str("## 其他问题（warning/info 级）\n\n");
         let others: Vec<&Finding> = self
             .result
             .findings
             .iter()
             .filter(|f| f.severity != Severity::Error)
             .collect();
-        for group in group_by_rule_severity(&others) {
-            out.push_str(&format!(
-                "| {} {} | {} | {} |\n",
-                group.rule_id,
-                group.findings[0].rule_name,
-                group.findings[0].severity.label(),
-                group.findings.len(),
-            ));
+        if others.is_empty() {
+            out.push_str("无。\n\n");
+        } else {
+            for group in group_by_rule_severity(&others) {
+                out.push_str(&format!(
+                    "### {} {} ({}) — {} 处\n\n",
+                    group.rule_id,
+                    group.findings[0].rule_name,
+                    group.findings[0].severity.label(),
+                    group.findings.len(),
+                ));
+                out.push_str("涉及最多的文件：\n\n");
+                for (file, count) in top_files(&group.findings, 5) {
+                    out.push_str(&format!("- {} — {} 处\n", file, count));
+                }
+                out.push('\n');
+            }
         }
         out
     }
@@ -352,6 +361,6 @@ mod tests {
         assert!(md.contains("**修复建议**"));
         assert!(md.contains("R01 test-rule — 3 处"));
         assert!(md.contains("b.cs — 2 处"));
-        assert!(md.contains("R07 test-rule | warning | 1 |"));
+        assert!(md.contains("R07 test-rule (warning) — 1 处"));
     }
 }

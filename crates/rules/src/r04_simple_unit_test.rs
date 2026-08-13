@@ -31,7 +31,8 @@ impl Rule for SimpleUnitTest {
     }
 
     fn analyze(&self, ctx: &AnalysisContext) -> Result<Vec<Finding>, RuleError> {
-        let min_asserts = ctx.rule_config.threshold_i64("min_assertions", 2) as usize;
+        // 默认只报 0 断言：单断言测试（如验证不崩溃）是合理的
+        let min_asserts = ctx.rule_config.threshold_i64("min_assertions", 1) as usize;
         let function_kinds = function_kinds(ctx.language);
         let mut findings = Vec::new();
 
@@ -204,4 +205,20 @@ fn count_expect_calls(node: &tree_sitter::Node, ctx: &AnalysisContext) -> usize 
         }
     });
     count
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::analyze_source;
+
+    #[test]
+    fn zero_assert_test_flagged_one_assert_not() {
+        let zero = "test('x', () => { const a = 1; });";
+        let findings = analyze_source(&SimpleUnitTest, zero, Language::TypeScript);
+        assert_eq!(findings.len(), 1);
+
+        let one = "test('x', () => { expect(a).toBe(1); });";
+        assert!(analyze_source(&SimpleUnitTest, one, Language::TypeScript).is_empty());
+    }
 }

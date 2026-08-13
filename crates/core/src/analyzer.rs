@@ -98,6 +98,9 @@ impl Analyzer {
                     }
                     let default_config = crate::config::RuleConfig::default();
                     let rule_config = self.config.rules.get(rule.id()).unwrap_or(&default_config);
+                    if rule_config.excludes_file(file) {
+                        continue;
+                    }
                     let ctx = AnalysisContext {
                         source: &source,
                         tree: &tree,

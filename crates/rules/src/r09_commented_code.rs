@@ -92,7 +92,40 @@ fn looks_like_code(content: &str) -> bool {
     if content.is_empty() {
         return false;
     }
+    // 说明性/文档性注释（注意/说明/警告/TODO 等）不是注释掉的代码
+    let doc_markers = [
+        "注意", "说明", "警告", "备注", "TODO", "FIXME", "HACK", "XXX", "NOTE", "Note",
+    ];
+    if doc_markers.iter().any(|m| content.starts_with(m)) {
+        return false;
+    }
     let code_signals = [';', '{', '}', '=', '(', ')', '<', '>'];
     let signal_count = content.chars().filter(|c| code_signals.contains(c)).count();
     signal_count >= 2
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::analyze_source;
+
+    #[test]
+    fn doc_marker_lines_not_counted_as_code() {
+        // 3 行里 1 行是说明注释 → 代码行不足 3，不报
+        let source = "// 注意：不要删除
+// var x = 1;
+// var y = 2;
+";
+        assert!(analyze_source(&CommentedCode, source, Language::CSharp).is_empty());
+    }
+
+    #[test]
+    fn consecutive_code_lines_still_flagged() {
+        let source = "// var x = 1;
+// var y = 2;
+// var z = 3;
+";
+        let findings = analyze_source(&CommentedCode, source, Language::CSharp);
+        assert_eq!(findings.len(), 1);
+    }
 }

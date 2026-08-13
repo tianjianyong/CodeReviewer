@@ -83,7 +83,7 @@ pub(crate) mod test_util {
             source,
             tree: &tree,
             language,
-            file_path: Path::new("test"),
+            file_path: Path::new("src/example.cs"),
             rule_config: &cfg,
         };
         rule.analyze(&ctx).expect("rule failed")

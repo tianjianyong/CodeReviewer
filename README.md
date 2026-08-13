@@ -145,6 +145,15 @@ max_parameters = 5
 enabled = false
 ```
 
+### 规则级文件排除
+
+`rules.<ID>.exclude_files` 按文件名子串（不区分大小写）让某条规则跳过特定文件：
+
+```toml
+[rules.R24]
+exclude_files = ["NavisworksTestAutomationClient", "TestAutomationHttpService"]
+```
+
 ## 支持语言
 
 解析层：Rust、Python、TypeScript (含 TSX)、C#、Java。

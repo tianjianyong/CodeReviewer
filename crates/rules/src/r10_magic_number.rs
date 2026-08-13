@@ -38,6 +38,7 @@ impl Rule for MagicNumber {
         let literal_kinds = literal_kinds(ctx.language);
         let skip_parent_kinds = skip_parent_kinds(ctx.language);
         let min_string_len = ctx.rule_config.threshold_i64("min_string_length", 10) as usize;
+        let _ = min_string_len; // 字符串检测已移除，阈值保留兼容
         let mut findings = Vec::new();
 
         walk(ctx.tree.root_node(), &mut |node| {
@@ -48,7 +49,11 @@ impl Rule for MagicNumber {
                 return;
             }
             let text = node_text(&node, ctx.source);
-            if !is_magic(node.kind(), text, min_string_len) {
+            if !is_magic(text) {
+                return;
+            }
+            // GetHashCode/hashCode 方法内的哈希种子必须保持原值，跳过
+            if is_in_hash_method(&node, ctx) {
                 return;
             }
             findings.push(Finding::new(
@@ -94,16 +99,13 @@ fn skip_parent_kinds(lang: Language) -> Vec<&'static str> {
 }
 
 fn literal_kinds(lang: Language) -> &'static [&'static str] {
+    // 只检测数字字面量：字符串中的注册名/资源名/UI 文案误报率高，已移除
     match lang {
-        Language::Rust => &["integer_literal", "float_literal", "string_literal"],
-        Language::Python => &["integer", "float", "string"],
-        Language::TypeScript | Language::TypeScriptTsx => &["number", "string", "template_string"],
-        Language::CSharp => &["integer_literal", "real_literal", "string_literal"],
-        Language::Java => &[
-            "decimal_integer_literal",
-            "decimal_floating_point_literal",
-            "string_literal",
-        ],
+        Language::Rust => &["integer_literal", "float_literal"],
+        Language::Python => &["integer", "float"],
+        Language::TypeScript | Language::TypeScriptTsx => &["number"],
+        Language::CSharp => &["integer_literal", "real_literal"],
+        Language::Java => &["decimal_integer_literal", "decimal_floating_point_literal"],
     }
 }
 
@@ -133,34 +135,34 @@ fn is_test_file(path: &std::path::Path) -> bool {
         || name.ends_with("tests.java")
 }
 
-fn is_magic(kind: &str, text: &str, min_string_len: usize) -> bool {
-    if kind.contains("string") || kind == "template_string" {
-        if text.len() <= min_string_len {
-            return false;
-        }
-        if text.contains("{}") || text.contains("{0}") || text.contains("{1}") {
-            return false;
-        }
-        // 含 CJK 的字符串是人类可读文案（UI 提示等），不是魔法字面量
-        if text.chars().any(is_cjk) {
-            return false;
-        }
-        return true;
-    }
+fn is_magic(text: &str) -> bool {
     let n: i64 = text.trim().parse().unwrap_or(0);
     !matches!(n, 0 | 1 | -1 | 2 | 10 | 100 | 1000)
 }
 
-/// CJK 统一表意文字（基本区 + 扩展 A）。
-fn is_cjk(c: char) -> bool {
-    ('\u{4E00}'..='\u{9FFF}').contains(&c) || ('\u{3400}'..='\u{4DBF}').contains(&c)
+/// 数字是否位于 GetHashCode/hashCode 方法内（哈希种子必须保持原值）。
+fn is_in_hash_method(node: &tree_sitter::Node, ctx: &AnalysisContext) -> bool {
+    let mut current = node.parent();
+    while let Some(p) = current {
+        if p.kind() == "method_declaration" {
+            let mut cursor = p.walk();
+            for child in p.children(&mut cursor) {
+                if child.kind() == "identifier" {
+                    let name = node_text(&child, ctx.source);
+                    return name == "GetHashCode" || name == "hashCode";
+                }
+            }
+            return false;
+        }
+        current = p.parent();
+    }
+    false
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use std::path::Path;
-
-    use super::{is_magic, is_test_file};
 
     #[test]
     fn test_relative_path_with_tests_dir() {
@@ -202,20 +204,27 @@ mod tests {
     }
 
     #[test]
-    fn cjk_strings_are_not_magic() {
-        // 中文 UI 文案不是魔法字面量
-        assert!(!is_magic(
-            "string_literal",
-            "\"起点不能为空，请重新输入\"",
-            10
-        ));
-        // ASCII 编码/协议串仍然是魔法字面量
-        assert!(is_magic(
-            "string_literal",
-            "\"application/json;charset=utf-8\"",
-            10
-        ));
-        // 数字字面量不受影响
-        assert!(is_magic("integer_literal", "20", 10));
+    fn numbers_flagged_common_excluded() {
+        assert!(is_magic("20"));
+        assert!(is_magic("-1609761766"));
+        assert!(!is_magic("2"));
+    }
+
+    #[test]
+    fn hash_seed_in_gethashcode_skipped() {
+        let source = "public class A { public override int GetHashCode() { return -1609761766; } public int B() { return 42; } }";
+        let findings =
+            crate::test_util::analyze_source(&super::MagicNumber, source, Language::CSharp);
+        // GetHashCode 内的种子跳过，B() 内的 42 报
+        assert_eq!(findings.len(), 1);
+        assert!(findings[0].message.contains("42"));
+    }
+
+    #[test]
+    fn string_literals_not_flagged() {
+        let source = "public class A { public string M() { return \"AutoPathPlanning\"; } }";
+        let findings =
+            crate::test_util::analyze_source(&super::MagicNumber, source, Language::CSharp);
+        assert!(findings.is_empty());
     }
 }
