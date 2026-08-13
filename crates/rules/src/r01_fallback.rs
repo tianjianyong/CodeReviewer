@@ -9,7 +9,9 @@ use codereviewer_core::finding::{Finding, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
 
-use crate::common::{body_uses_word, exception_var, is_broad_catch, returns_generic};
+use crate::common::{
+    body_uses_word, catch_type_name, exception_var, is_broad_catch, returns_hardcoded_default,
+};
 
 pub struct FallbackMasksError;
 
@@ -108,27 +110,56 @@ fn find_catch_fallbacks(ctx: &AnalysisContext, findings: &mut Vec<Finding>) {
     walk(ctx.tree.root_node(), &mut |node| {
         if node.kind() == "catch_clause" && has_return_in_subtree(&node) {
             let text = node_text(&node, ctx.source);
-            let exc_var = exception_var(&node, ctx);
-            let uses_exc = !exc_var.is_empty() && body_uses_word(text, &exc_var);
-            // R23 会报的场景（宽泛 catch + 固定值返回 + 未引用异常变量）由 R23 判定，避免重复
-            if is_broad_catch(&node, ctx) && returns_generic(&node, ctx) && !uses_exc {
+            // 豁免 1：取消是受控流程，不算掩盖异常
+            let type_name = catch_type_name(&node, ctx);
+            if type_name.ends_with("OperationCanceledException")
+                || type_name.ends_with("TaskCanceledException")
+            {
                 return;
             }
-            // 引用异常变量（日志/返回值携带）或有日志 → 防御式处理；否则才是静默吞
-            let (severity, msg) = if uses_exc || has_logging(text) {
-                (
-                    Severity::Info,
-                    "catch 记录日志或返回值携带异常信息，防御式处理 | catch logs or carries exception context, defensive handling",
-                )
-            } else {
+            // 豁免 2：.NET Try* 惯例（Try 前缀方法 + catch 返回 false）
+            if enclosing_method_name(&node, ctx).starts_with("Try") {
+                return;
+            }
+            let exc_var = exception_var(&node, ctx);
+            let uses_exc = !exc_var.is_empty() && body_uses_word(text, &exc_var);
+            // 收紧：error 只保留「宽泛 catch + 硬编码默认返回 + 无日志 + 不引用 ex」
+            let silent = is_broad_catch(&node, ctx)
+                && returns_hardcoded_default(text)
+                && !uses_exc
+                && !has_logging(text);
+            let (severity, msg) = if silent {
                 (
                     Severity::Error,
                     "catch 以默认返回值掩盖异常 | catch with default return masks exception",
+                )
+            } else {
+                (
+                    Severity::Info,
+                    "catch 记录日志或返回值携带异常信息，防御式处理 | catch logs or carries exception context, defensive handling",
                 )
             };
             push_finding(findings, ctx, &node, severity, msg);
         }
     });
+}
+
+/// 最内层方法声明的名字（C# 的 Try* 惯例检测用）。
+fn enclosing_method_name(node: &tree_sitter::Node, ctx: &AnalysisContext) -> String {
+    let mut current = node.parent();
+    while let Some(p) = current {
+        if p.kind() == "method_declaration" {
+            let mut cursor = p.walk();
+            for child in p.children(&mut cursor) {
+                if child.kind() == "identifier" {
+                    return node_text(&child, ctx.source).to_string();
+                }
+            }
+            return String::new();
+        }
+        current = p.parent();
+    }
+    String::new()
 }
 
 /// catch 体内是否有日志调用（C#/TS/Java 常见日志框架与自定义 LogXxx 方法）。
@@ -225,14 +256,45 @@ mod tests {
     }
 
     #[test]
-    fn broad_catch_generic_return_owned_by_r23_not_r01() {
+    fn broad_catch_default_return_is_error() {
         let source = "public class A { public int M() { try { return 1; } catch (Exception ex) { return 0; } } }";
+        let findings = analyze_source(&FallbackMasksError, source, Language::CSharp);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].severity, Severity::Error);
+    }
+
+    #[test]
+    fn cancellation_catch_is_exempt() {
+        let source = "public class A { public int M() { try { return 1; } catch (OperationCanceledException) { return 0; } } }";
         assert!(analyze_source(&FallbackMasksError, source, Language::CSharp).is_empty());
     }
 
     #[test]
-    fn narrow_catch_no_log_no_ex_is_error() {
+    fn try_method_catch_is_exempt() {
+        let source = "public class A { public bool TryParse(string s) { try { return true; } catch { return false; } } }";
+        assert!(analyze_source(&FallbackMasksError, source, Language::CSharp).is_empty());
+    }
+
+    #[test]
+    fn narrow_catch_is_info_not_error() {
         let source = "public class A { public int M() { try { return 1; } catch (IOException ex) { return 0; } } }";
+        let findings = analyze_source(&FallbackMasksError, source, Language::CSharp);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].severity, Severity::Info);
+    }
+
+    #[test]
+    fn bare_catch_default_return_is_error() {
+        let source =
+            "public class A { public double F() { try { return 1.0; } catch { return 0.1; } } }";
+        let findings = analyze_source(&FallbackMasksError, source, Language::CSharp);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].severity, Severity::Error);
+    }
+
+    #[test]
+    fn bare_catch_new_object_return_is_error() {
+        let source = "public class A { public B F() { try { return null; } catch { return new B(); } } } public class B {}";
         let findings = analyze_source(&FallbackMasksError, source, Language::CSharp);
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].severity, Severity::Error);

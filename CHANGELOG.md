@@ -24,6 +24,8 @@
 
 ### 变更（Changed）
 
+- 规则校准第三轮（AI agent 反馈）：R01 error 收紧为「宽泛 catch + 硬编码默认返回 + 无日志 + 不引用 ex」，豁免 OperationCanceledException/TaskCanceledException（受控取消）与 .NET Try* 惯例方法，具体异常类型 + 语义返回降 info；修复多行 bare catch（catch 换行 {）未被识别为宽泛的 bug；R01 error 61 → 40，误差级清单为可执行修复清单
+
 - 规则校准第二轮（AI agent 反馈）：R01 补"引用异常变量"判定（ex 用于日志/返回值 → info，完全不引用且无日志才 error）并与 R23 去重（宽泛+固定返回归 R23）；修复 C# `catch_declaration` 导致 R23 异常变量提取为空（ex 豁免首次真正生效，R23 152→4）；宽泛 catch 精确匹配基类（IOException 等具体异常不再算宽泛）；R24 跳过 XML 命名空间 URI；抽共享 rules/common.rs
 
 - 规则校准（实测驱动）：R01 catch+return 按有无日志拆两档（无日志 error / 有日志 info 防御式处理）；R10 只报数字字面量（字符串误报率高，已移除）并跳过 GetHashCode/hashCode 哈希种子；R04 默认阈值降为 1（只报无断言测试）；R09 说明性注释（注意/说明/TODO 等）不计入注释代码块；规则级 `exclude_files` 文件排除（如测试基础设施退出 R24）

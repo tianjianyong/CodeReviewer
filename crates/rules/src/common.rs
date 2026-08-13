@@ -58,7 +58,9 @@ pub fn is_broad_catch(node: &tree_sitter::Node, ctx: &AnalysisContext) -> bool {
                 || trimmed.starts_with("except BaseException")
         }
         _ => {
-            if text.contains("catch {") {
+            // bare catch：catch 后直接跟 {（允许换行）
+            let after_catch = text.trim_start().strip_prefix("catch").unwrap_or("");
+            if after_catch.trim_start().starts_with('{') {
                 return true;
             }
             let Some(open) = text.find('(') else {
@@ -102,6 +104,48 @@ pub fn returns_generic(node: &tree_sitter::Node, ctx: &AnalysisContext) -> bool 
         "return StatusCode::INTERNAL_SERVER_ERROR",
     ];
     generic_returns.iter().any(|g| text.contains(g))
+}
+
+/// 提取 catch 的异常类型名（bare catch 返回空串）。
+pub fn catch_type_name(node: &tree_sitter::Node, ctx: &AnalysisContext) -> String {
+    let text = node_text(node, ctx.source);
+    let Some(open) = text.find('(') else {
+        return String::new();
+    };
+    text[open + 1..]
+        .split([')', ' ', '\t'])
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_string()
+}
+
+/// catch 体内是否返回硬编码默认值（数字/null/false/true/字符串/new 对象/default）。
+pub fn returns_hardcoded_default(text: &str) -> bool {
+    for line in text.lines() {
+        let Some(pos) = line.find("return") else {
+            continue;
+        };
+        let rest = line[pos + 6..].trim();
+        let token = rest.split([';', ' ']).next().unwrap_or("");
+        if token.is_empty() {
+            continue;
+        }
+        let is_number = token.parse::<f64>().is_ok()
+            || (token.starts_with('-') && token[1..].parse::<f64>().is_ok());
+        if token == "null"
+            || token == "false"
+            || token == "true"
+            || token == "default"
+            || token == "new"
+            || token.starts_with('"')
+            || token.starts_with('\'')
+            || is_number
+        {
+            return true;
+        }
+    }
+    false
 }
 
 /// 头部（':' 或 '{'）之后的体内是否按词边界引用了变量。
