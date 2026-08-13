@@ -1,5 +1,7 @@
 //! Built-in rule set for CodeReviewer.
 
+mod common;
+
 mod r01_fallback;
 mod r02_bloat;
 mod r03_missing_doc;

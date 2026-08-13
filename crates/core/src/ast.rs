@@ -23,3 +23,31 @@ pub fn node_text<'a>(node: &Node, source: &'a str) -> &'a str {
 pub fn line_of(source: &str, row: usize) -> &str {
     source.lines().nth(row).unwrap_or("")
 }
+
+/// 词边界包含：避免 "e" 命中 "return"、"error"。
+pub fn contains_word(text: &str, word: &str) -> bool {
+    fn is_word_char(c: char) -> bool {
+        c.is_alphanumeric() || c == '_'
+    }
+    let mut rest = text;
+    while let Some(pos) = rest.find(word) {
+        let end = pos + word.len();
+        let before_ok = pos == 0
+            || !rest[..pos]
+                .chars()
+                .last()
+                .map(is_word_char)
+                .unwrap_or(false);
+        let after_ok = end >= rest.len()
+            || !rest[end..]
+                .chars()
+                .next()
+                .map(is_word_char)
+                .unwrap_or(false);
+        if before_ok && after_ok {
+            return true;
+        }
+        rest = &rest[pos + 1..];
+    }
+    false
+}

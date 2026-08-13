@@ -9,6 +9,8 @@ use codereviewer_core::finding::{Finding, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
 
+use crate::common::{body_uses_word, exception_var, is_broad_catch, returns_generic};
+
 pub struct FallbackMasksError;
 
 impl Rule for FallbackMasksError {
@@ -106,11 +108,17 @@ fn find_catch_fallbacks(ctx: &AnalysisContext, findings: &mut Vec<Finding>) {
     walk(ctx.tree.root_node(), &mut |node| {
         if node.kind() == "catch_clause" && has_return_in_subtree(&node) {
             let text = node_text(&node, ctx.source);
-            // 有日志的 catch+return 是防御式处理，降为 info；无日志才是静默吞错误
-            let (severity, msg) = if has_logging(text) {
+            let exc_var = exception_var(&node, ctx);
+            let uses_exc = !exc_var.is_empty() && body_uses_word(text, &exc_var);
+            // R23 会报的场景（宽泛 catch + 固定值返回 + 未引用异常变量）由 R23 判定，避免重复
+            if is_broad_catch(&node, ctx) && returns_generic(&node, ctx) && !uses_exc {
+                return;
+            }
+            // 引用异常变量（日志/返回值携带）或有日志 → 防御式处理；否则才是静默吞
+            let (severity, msg) = if uses_exc || has_logging(text) {
                 (
                     Severity::Info,
-                    "catch 有日志但以默认返回值掩盖异常（防御式处理） | catch logs but masks exception with default return (defensive handling)",
+                    "catch 记录日志或返回值携带异常信息，防御式处理 | catch logs or carries exception context, defensive handling",
                 )
             } else {
                 (
@@ -123,7 +131,7 @@ fn find_catch_fallbacks(ctx: &AnalysisContext, findings: &mut Vec<Finding>) {
     });
 }
 
-/// catch 体内是否有日志调用（C#/TS/Java 常见日志框架）。
+/// catch 体内是否有日志调用（C#/TS/Java 常见日志框架与自定义 LogXxx 方法）。
 fn has_logging(text: &str) -> bool {
     [
         "LogManager",
@@ -137,6 +145,13 @@ fn has_logging(text: &str) -> bool {
         "Log(",
         "log.",
         "log(",
+        "LogError",
+        "LogWarning",
+        "LogInfo",
+        "LogDebug",
+        "LogException",
+        "logError",
+        "logWarning",
         "Debug.",
         "Debug.WriteLine",
         "Debug.Print",
@@ -202,8 +217,22 @@ mod tests {
     }
 
     #[test]
-    fn catch_without_logging_is_error() {
+    fn catch_ex_used_in_return_is_info() {
+        let source = "public class A { public string M() { try { return \"x\"; } catch (Exception ex) { return $\"异常: {ex.Message}\"; } } }";
+        let findings = analyze_source(&FallbackMasksError, source, Language::CSharp);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].severity, Severity::Info);
+    }
+
+    #[test]
+    fn broad_catch_generic_return_owned_by_r23_not_r01() {
         let source = "public class A { public int M() { try { return 1; } catch (Exception ex) { return 0; } } }";
+        assert!(analyze_source(&FallbackMasksError, source, Language::CSharp).is_empty());
+    }
+
+    #[test]
+    fn narrow_catch_no_log_no_ex_is_error() {
+        let source = "public class A { public int M() { try { return 1; } catch (IOException ex) { return 0; } } }";
         let findings = analyze_source(&FallbackMasksError, source, Language::CSharp);
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].severity, Severity::Error);

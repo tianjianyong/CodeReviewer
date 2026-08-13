@@ -9,6 +9,8 @@ use codereviewer_core::finding::{Finding, Severity};
 use codereviewer_core::parser::Language;
 use codereviewer_core::rule::{AnalysisContext, Rule, RuleError};
 
+use crate::common::{body_uses_word, exception_var, is_broad_catch, returns_generic};
+
 pub struct WrongErrorTypePropagation;
 
 impl Rule for WrongErrorTypePropagation {
@@ -76,113 +78,6 @@ fn catch_kind(lang: Language) -> &'static str {
     }
 }
 
-fn is_broad_catch(node: &tree_sitter::Node, ctx: &AnalysisContext) -> bool {
-    let text = node_text(node, ctx.source);
-    match ctx.language {
-        Language::Python => {
-            let trimmed = text.trim_start();
-            trimmed.starts_with("except:")
-                || trimmed.starts_with("except Exception")
-                || trimmed.starts_with("except BaseException")
-        }
-        _ => {
-            // catch (Exception / Throwable / Error e) 或 bare catch
-            text.contains("Exception")
-                || text.contains("Throwable")
-                || text.contains("(e)")
-                || text.contains("catch {")
-        }
-    }
-}
-
-fn exception_var(node: &tree_sitter::Node, ctx: &AnalysisContext) -> String {
-    let mut cursor = node.walk();
-    let children: Vec<tree_sitter::Node> = node.children(&mut cursor).collect();
-    // Python: "except Exception as e" 解析为 as_pattern 子节点
-    for child in &children {
-        if child.kind() == "as_pattern" {
-            let text = node_text(child, ctx.source);
-            if let Some(pos) = text.find(" as ") {
-                return text[pos + 4..].trim().to_string();
-            }
-        }
-    }
-    // C#/Java/TS: catch (Exception e) 的 e 是 identifier 子节点
-    for child in &children {
-        if child.kind() == "identifier" {
-            let t = node_text(child, ctx.source);
-            // 跳过类型名 Exception/Throwable
-            if !matches!(t, "Exception" | "Throwable" | "Error" | "BaseException") {
-                return t.to_string();
-            }
-        }
-    }
-    String::new()
-}
-
-fn returns_generic(node: &tree_sitter::Node, ctx: &AnalysisContext) -> bool {
-    let text = node_text(node, ctx.source);
-    // 体内 return 一个固定数字状态码 / None / null / false / 泛型 Error
-    let generic_returns = [
-        "return 500",
-        "return 400",
-        "return 404",
-        "return 422",
-        "return None",
-        "return null",
-        "return False",
-        "return false",
-        "return 0",
-        "return -1",
-        "return Err(Generic",
-        "return Err(generic",
-        "throw new Error(",
-        "return ResponseEntity.status(500)",
-        "return StatusCode::INTERNAL_SERVER_ERROR",
-    ];
-    generic_returns.iter().any(|g| text.contains(g))
-}
-
-/// 在 catch 头部之后（':' 或 '{' 后）检查异常变量是否被使用。
-/// 此前实现直接在头部文本上 counts，"except Exception as e" 里的 "e" 总是命中，
-/// 导致带异常变量的常见写法永远不会被报。
-fn body_uses_word(text: &str, word: &str) -> bool {
-    let body = text
-        .find(':')
-        .or_else(|| text.find('{'))
-        .map(|i| &text[i + 1..])
-        .unwrap_or("");
-    contains_word(body, word)
-}
-
-/// 词边界包含：避免 "e" 命中 "return"、"error"。
-fn contains_word(text: &str, word: &str) -> bool {
-    fn is_word_char(c: char) -> bool {
-        c.is_alphanumeric() || c == '_'
-    }
-    let mut rest = text;
-    while let Some(pos) = rest.find(word) {
-        let end = pos + word.len();
-        let before_ok = pos == 0
-            || !rest[..pos]
-                .chars()
-                .last()
-                .map(is_word_char)
-                .unwrap_or(false);
-        let after_ok = end >= rest.len()
-            || !rest[end..]
-                .chars()
-                .next()
-                .map(is_word_char)
-                .unwrap_or(false);
-        if before_ok && after_ok {
-            return true;
-        }
-        rest = &rest[pos + 1..];
-    }
-    false
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -206,9 +101,10 @@ mod tests {
 
     #[test]
     fn contains_word_respects_boundaries() {
-        assert!(contains_word("print(e)", "e"));
-        assert!(!contains_word("return", "e"));
-        assert!(!contains_word("error", "e"));
-        assert!(contains_word("log_error(e)", "e"));
+        let cw = codereviewer_core::ast::contains_word;
+        assert!(cw("print(e)", "e"));
+        assert!(!cw("return", "e"));
+        assert!(!cw("error", "e"));
+        assert!(cw("log_error(e)", "e"));
     }
 }

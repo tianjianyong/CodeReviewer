@@ -50,6 +50,11 @@ impl Rule for HardcodedPathOrUrl {
                 if env_signals.iter().any(|s| line_text.contains(s)) {
                     return;
                 }
+                // XML 命名空间标识符（Namespace = "http://..." / " ns " 变量）不是可访问 URL
+                let lower = line_text.to_lowercase();
+                if lower.contains("namespace") || lower.contains(" ns ") {
+                    return;
+                }
                 findings.push(Finding::new(
                     "R24",
                     "hardcoded-path-or-url",
@@ -185,4 +190,27 @@ fn is_test_file(path: &std::path::Path) -> bool {
         || name.contains("_test.")
         || name.contains(".test.")
         || name.contains(".spec.")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::analyze_source;
+
+    #[test]
+    fn xml_namespace_urls_skipped() {
+        let source = "public class A { private readonly string _delmiaNamespace = \"http://www.3ds.com/delmia/pathplanning\"; }";
+        assert!(analyze_source(&HardcodedPathOrUrl, source, Language::CSharp).is_empty());
+        let ns = "public class A { private const string ns = \"http://www.dassaultsystemes.com/delmia/apriso\"; }";
+        assert!(analyze_source(&HardcodedPathOrUrl, ns, Language::CSharp).is_empty());
+    }
+
+    #[test]
+    fn plain_urls_still_flagged() {
+        let source = "public class A { private readonly string api = \"http://www.3ds.com/delmia/pathplanning\"; }";
+        assert_eq!(
+            analyze_source(&HardcodedPathOrUrl, source, Language::CSharp).len(),
+            1
+        );
+    }
 }
