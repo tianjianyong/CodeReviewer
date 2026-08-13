@@ -21,11 +21,10 @@
 | 首批语言 | Rust + Python + TypeScript + C# + Java | 2026-06-21 |
 | 规则系统 | TOML 配置驱动 | 2026-06-21 |
 | MCP 传输 | stdio | 2026-06-21 |
-| LLM 适配 | MVP 仅留 trait 空壳，Phase 2 实现 | 2026-06-21 |
 | 严重级 | error / warning / info 三级 | 2026-06-21 |
 | 输出格式 | 终端彩色 + JSON | 2026-06-21 |
 | 配置文件 | 项目根 `.codereviewer.toml` | 2026-06-21 |
-| 规则调度 | MVP 顺序执行（非并行） | 2026-06-21 |
+| 规则调度 | 文件级并行（rayon） | 2026-08-13（原 2026-06-21 顺序执行） |
 | Shell 命令 | `pwsh -Command "..."` | 2026-06-21 |
 
 ## MVP 检测项清单
@@ -207,3 +206,5 @@ pwsh -Command "cargo build"
 | 2026-06-21 | Phase 2 完成：10 条规则全部实现 + CLI 过滤参数 + 6 个集成测试全绿 |
 | 2026-06-21 | Phase 3 完成：MCP server（review + list_rules 工具）端到端 JSON-RPC 测试通过 |
 | 2026-06-21 | Phase 4 关键项完成：README + opencode skill + 配置查找改进；MVP 全部交付 |
+| 2026-06-22 | AI 专项规则批次：R14/R15/R16/R18/R19/R20/R23/R24/R28 落地（19 条规则） |
+| 2026-08-13 | 代码审计整改：排除误伤修复、路径校验、CLI 参数校验、退出码、R07/R19/R23/R06 规则 bug 修复、共享 ast 工具、单次读取、gitignore 继承、parse_errors 上报、MCP 读配置、并行分析（rayon）、clippy 清零、CI + LICENSE；R23 支持 as_pattern；llm 空壳与 RuleError::Failed 删除 |

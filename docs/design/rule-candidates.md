@@ -57,8 +57,8 @@
 ## 已实现规则的已知局限
 
 - **R15**：MVP 仅检测「参数索引/除长度无守护」的常见模式，不识别框架级 validator（可能误报）
-- **R18**：仅做单文件内 async fn 名匹配，无跨文件类型信息（漏报外部 async 调用）
-- **R19**：无 schema 信息，靠 queryset 信号词启发式，可能误报普通循环
-- **R20**：Rust 因 RAII 不适用；Python/JS 检测同函数内 close 配对，跨函数释放漏报
-- **R23**：仅检测宽泛 catch 返回固定码且不引用异常变量的模式
-- **R28**：仅检测 `Some/Ok` 字面量上的 unwrap_or，复杂不可失败路径漏报
+- **R18**：仅做单文件内 async fn 名匹配，无跨文件类型信息（漏报外部 async 调用）；仅支持 Python/TS/TSX
+- **R19**：无 schema 信息，靠 queryset 信号词启发式，可能误报普通循环；仅支持 Python/TS/TSX
+- **R20**：仅支持 Python/TS/TSX；Python/JS 检测同函数内 close 配对，跨函数释放漏报（Rust RAII 不适用，C#/Java using/try-with-resources 未实现）
+- **R23**：仅检测宽泛 catch 返回固定码且不引用异常变量的模式（异常变量按词边界在 catch 体内匹配，支持 Python `as_pattern`）；仅支持 Python/TS/TSX/C#/Java
+- **R28**：仅检测 `Some/Ok` 字面量上的 unwrap_or 与 TS `??` 字面量，复杂不可失败路径漏报；仅支持 Rust/TS/TSX
