@@ -27,6 +27,9 @@ enum Command {
         /// Write the report to a file instead of stdout
         #[arg(long)]
         output: Option<PathBuf>,
+        /// Compare against a previous JSON report and only show new findings
+        #[arg(long)]
+        baseline: Option<PathBuf>,
         /// Optional config file path
         #[arg(long)]
         config: Option<PathBuf>,
@@ -48,6 +51,7 @@ fn main() -> Result<()> {
             path,
             format,
             output,
+            baseline,
             config,
             rules,
             severity,
@@ -89,6 +93,19 @@ fn main() -> Result<()> {
             let mut result = analyzer.analyze_path(&path)?;
             if let Some(min) = min_severity {
                 result.findings.retain(|f| f.severity <= min);
+            }
+            if let Some(base_path) = &baseline {
+                let base = codereviewer_core::diff::load_baseline(base_path)
+                    .context("failed to load baseline")?;
+                let before = result.findings.len();
+                codereviewer_core::diff::retain_new(&mut result.findings, &base);
+                eprintln!(
+                    "基线对比：{} 条中新增 {} 条 | baseline diff: {} new of {}",
+                    before,
+                    result.findings.len(),
+                    result.findings.len(),
+                    before
+                );
             }
             let report = Report { result };
             let rendered = match format.as_str() {

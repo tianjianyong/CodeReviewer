@@ -3,6 +3,7 @@
 pub mod analyzer;
 pub mod ast;
 pub mod config;
+pub mod diff;
 pub mod finding;
 pub mod parser;
 pub mod reporter;

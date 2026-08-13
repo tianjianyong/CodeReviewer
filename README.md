@@ -24,6 +24,9 @@ pwsh -Command "./target/release/codereviewer check src/ --format md"
 pwsh -Command "./target/release/codereviewer check src/ --format md --output report.md"
 pwsh -Command "./target/release/codereviewer check src/ --format json --output report.json"
 
+# 与上次报告对比，只报新增问题（CI 增量门禁：只有新 error 才非零退出）
+pwsh -Command "./target/release/codereviewer check src/ --baseline report.json"
+
 # 只运行指定规则
 pwsh -Command "./target/release/codereviewer check src/ --rules R01,R02"
 
