@@ -36,6 +36,7 @@
 - JSON 输出新增 `snippet`、`skipped`、`parse_errors` 字段
 - 新增 `--format md` 汇总报告（统计 + error 级问题分组 + 修复建议 + 重灾区文件）与 `--output <file>` 报告落盘（详细报告用 `--format json --output`）
 - 新增 `--baseline <上次报告.json>` 增量对比：按 (file, line, rule) 过滤已存在问题，只报新增；退出码只反映新增 error（CI 增量门禁）
+- 配置发现支持新约定 `.codereviewer/config.toml`（与报告同目录，优先），根目录 `.codereviewer.toml` 兼容保留；README 增加在其他项目使用的目录约定（配置与报告统一放 `.codereviewer/`）
 - 规则声明语言与实现对齐：R18/R19/R20 仅 Python/TS/TSX，R23 不含 Rust，R28 仅 Rust/TS/TSX
 - 文件级并行分析（rayon），输出顺序保持确定性
 - r02 嵌套深度改为迭代实现（消除深 AST 递归栈溢出风险）

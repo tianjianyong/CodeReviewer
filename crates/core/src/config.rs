@@ -84,7 +84,8 @@ impl Config {
     }
 }
 
-/// 从 start 目录向上查找 .codereviewer.toml。
+/// 从 start 目录向上查找配置文件。
+/// 优先新约定 `.codereviewer/config.toml`，兼容旧的根目录 `.codereviewer.toml`。
 fn find_up_from(start: &Path) -> Option<std::path::PathBuf> {
     let mut current = if start.is_dir() {
         start
@@ -92,6 +93,10 @@ fn find_up_from(start: &Path) -> Option<std::path::PathBuf> {
         start.parent()?
     };
     loop {
+        let dir_config = current.join(".codereviewer").join("config.toml");
+        if dir_config.is_file() {
+            return Some(dir_config);
+        }
         let candidate = current.join(".codereviewer.toml");
         if candidate.is_file() {
             return Some(candidate);
@@ -115,5 +120,33 @@ mod tests {
         };
         assert!(cfg.excludes_file(Path::new("src/NavisworksTestAutomationClient.cs")));
         assert!(!cfg.excludes_file(Path::new("src/Commands/AutoPathPlanningCommand.cs")));
+    }
+
+    #[test]
+    fn find_up_from_prefers_dir_config_and_falls_back_to_legacy() {
+        let base =
+            std::env::temp_dir().join(format!("codereviewer-cfg-test-{}", std::process::id()));
+        let proj = base.join("proj");
+        let src = proj.join("src");
+        std::fs::create_dir_all(&src).unwrap();
+
+        // 只有旧约定：根目录 .codereviewer.toml
+        std::fs::write(proj.join(".codereviewer.toml"), "").unwrap();
+        let found = find_up_from(&src).unwrap();
+        assert!(found.ends_with(".codereviewer.toml"));
+        std::fs::remove_file(proj.join(".codereviewer.toml")).unwrap();
+
+        // 新约定：.codereviewer/config.toml
+        std::fs::create_dir_all(proj.join(".codereviewer")).unwrap();
+        std::fs::write(proj.join(".codereviewer").join("config.toml"), "").unwrap();
+        let found = find_up_from(&src).unwrap();
+        assert!(found.ends_with("config.toml"));
+
+        // 两者并存时优先新约定
+        std::fs::write(proj.join(".codereviewer.toml"), "").unwrap();
+        let found = find_up_from(&src).unwrap();
+        assert!(found.ends_with("config.toml"));
+
+        std::fs::remove_dir_all(&base).ok();
     }
 }

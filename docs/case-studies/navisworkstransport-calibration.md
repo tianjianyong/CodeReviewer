@@ -49,4 +49,4 @@ Try* 方法内的 catch + return false                       → 不报（.NET �
 2. **反馈方的预期数字是验证信号**——agent 预估 R01 error ~25，实测 5，数字对不上→追出多行 bare catch bug。校准循环里"实测数 vs 预期数"应显式对比
 3. **规则分档的价值**——同一规则按上下文分 severity（error/info/不报）比单一判定更接近真实使用；error 档应保持"每一条都可执行"
 4. **校准有终点**——反馈方主动喊停（哨兵值 -1/0/null 识别收益递减）。尊重使用方的判断，不再为了数字好看继续调
-5. **可配置性兜底**——无法通用的项目约定（文档在 docs/、测试基础设施路径）交给 `.codereviewer.toml`（禁用规则、调阈值、exclude_files），而不是写进规则
+5. **可配置性兜底**——无法通用的项目约定（文档在 docs/、测试基础设施路径）交给 `.codereviewer/config.toml`（禁用规则、调阈值、exclude_files），而不是写进规则

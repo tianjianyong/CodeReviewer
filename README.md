@@ -129,9 +129,10 @@ CodeReviewer 自动读取扫描目录下的 `.gitignore` 文件并排除其中�
 
 ### 项目特定排除
 
-在项目根创建 `.codereviewer.toml` 追加项目特定目录：
+配置文件支持两种位置（向上查找，优先前者）：
 
-> 配置发现顺序：从**扫描路径**所在目录向上查找，找不到再从当前工作目录向上查找，都没有则用默认。
+- `.codereviewer/config.toml`（推荐：与报告同目录，统一收在项目一个隐藏目录里）
+- 根目录 `.codereviewer.toml`（旧约定，兼容）
 
 ```toml
 [global]
@@ -162,6 +163,24 @@ exclude_files = ["NavisworksTestAutomationClient", "TestAutomationHttpService"]
 解析层：Rust、Python、TypeScript (含 TSX)、C#、Java。
 
 部分规则只实现了语言子集：R18/R19/R20 仅 Python/TS/TSX，R23 不含 Rust，R28 仅 Rust/TS/TSX，R06 仅 Rust，R07 不含 C#（using 是命名空间，单文件名字匹配原理上不可行）。
+
+## 在其他项目中使用
+
+推荐的目录约定：配置与报告统一收在目标项目的 `.codereviewer/` 目录，不污染项目根目录。
+
+```sh
+# 首次使用：建目录 + 可选调优配置
+mkdir .codereviewer
+
+# 扫描并输出报告到 .codereviewer/
+pwsh -Command "./target/release/codereviewer check src/ --format md --output .codereviewer/report.md"
+pwsh -Command "./target/release/codereviewer check src/ --format json --output .codereviewer/report.json"
+
+# 增量门禁：只报新增问题
+pwsh -Command "./target/release/codereviewer check src/ --baseline .codereviewer/report.json"
+```
+
+建议在目标项目 `.gitignore` 中：提交 `config.toml`（团队共享调优），忽略 `report.*`（可再生产物）。
 
 ## 技术栈
 

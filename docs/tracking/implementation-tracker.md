@@ -23,7 +23,7 @@
 | MCP 传输 | stdio | 2026-06-21 |
 | 严重级 | error / warning / info 三级 | 2026-06-21 |
 | 输出格式 | 终端彩色 + JSON | 2026-06-21 |
-| 配置文件 | 项目根 `.codereviewer.toml` | 2026-06-21 |
+| 配置文件 | 项目根 `.codereviewer/config.toml` | 2026-08-13（原 2026-06-21 为根目录 `.codereviewer.toml`，兼容保留） |
 | 规则调度 | 文件级并行（rayon） | 2026-08-13（原 2026-06-21 顺序执行） |
 | Shell 命令 | `pwsh -Command "..."` | 2026-06-21 |
 
